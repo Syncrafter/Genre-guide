@@ -333,6 +333,38 @@ export const OriginalItchPageHost: React.FC<OriginalItchPageHostProps> = ({
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(cleanedHtml, 'text/html');
+    
+ 
+
+    // Rewrite root-relative /assets/ paths for GitHub Pages subpath hosting
+    doc.querySelectorAll('[src^="/assets/"]').forEach((el) => {
+      const val = el.getAttribute('src');
+      if (val) el.setAttribute('src', `${import.meta.env.BASE_URL}${val.slice(1)}`);
+    });
+    doc.querySelectorAll('[href^="/assets/"]').forEach((el) => {
+      const val = el.getAttribute('href');
+      if (val) el.setAttribute('href', `${import.meta.env.BASE_URL}${val.slice(1)}`);
+    });
+    doc.querySelectorAll('style, [style]').forEach((el) => {
+      if (el.tagName === 'STYLE' && el.textContent) {
+        el.textContent = el.textContent.replace(
+          /url\((['"]?)\/assets\//g,
+          `url($1${import.meta.env.BASE_URL}assets/`
+        );
+      }
+      const inlineStyle = el.getAttribute('style');
+      if (inlineStyle && inlineStyle.includes('/assets/')) {
+        el.setAttribute(
+          'style',
+          inlineStyle.replace(
+            /url\((['"]?)\/assets\//g,
+            `url($1${import.meta.env.BASE_URL}assets/`
+          )
+        );
+      }
+    });
+
+    
 
         // Remove restrictive CSP meta or inline scripts from saved HTML
         doc
