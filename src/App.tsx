@@ -493,6 +493,7 @@ export default function App() {
     const isStaticTabletBar = viewportWidth > 650 && viewportWidth <= 960;
 
     if (isMobileBottomBar) {
+      const mobileMaxHeightPx = Math.max(240, Math.round(viewportHeight - 76));
       return (
         <div
           key={activeTopButtonId}
@@ -506,8 +507,7 @@ export default function App() {
             onClose={() => setActiveTopButtonId(null)}
             onZoomMedia={handleZoomMedia}
             onOpenCitation={handleOpenCitation}
-            maxHeight="calc(100vh - 76px)"
-            compactMedia
+            maxHeightPx={mobileMaxHeightPx}
           />
         </div>
       );
@@ -515,9 +515,10 @@ export default function App() {
 
     const topPx = cornerAnchor ? Math.max(10, cornerAnchor.bottom + 7) : 94;
     const rightPx = cornerAnchor ? cornerAnchor.right : 10;
-    const maxCardHeight = isFixedDesktop
-      ? `calc(100vh - ${topPx + 14}px)`
-      : `${Math.max(260, Math.round(viewportHeight - topPx - 14))}px`;
+    const maxCardHeightPx = Math.max(
+      260,
+      Math.round(viewportHeight - topPx - 14)
+    );
 
     return (
       <div
@@ -541,7 +542,7 @@ export default function App() {
         }
         className={`${
           isFixedDesktop ? 'fixed' : 'absolute'
-        } z-40 w-[min(440px,calc(100vw-24px))] animate-emerge-left`}
+        } z-40 w-[min(456px,calc(100vw-24px))] animate-emerge-left`}
       >
         <InfoboxCard
           section={TOP_BUTTON_GUIDES[activeTopButtonId]}
@@ -550,8 +551,7 @@ export default function App() {
           onClose={() => setActiveTopButtonId(null)}
           onZoomMedia={handleZoomMedia}
           onOpenCitation={handleOpenCitation}
-          maxHeight={maxCardHeight}
-          compactMedia
+          maxHeightPx={maxCardHeightPx}
         />
       </div>
     );
@@ -630,7 +630,10 @@ export default function App() {
               onOpenCitation={handleOpenCitation}
               pointerSide={opensOnRight ? 'left' : 'right'}
               pointerOffsetTop={sideCoords.pointerOffsetTop}
-              maxHeight={`calc(100vh - ${VIEWPORT_VERTICAL_MARGIN * 2}px)`}
+              maxHeightPx={Math.max(
+                280,
+                Math.round(viewportHeight - VIEWPORT_VERTICAL_MARGIN * 2)
+              )}
             />
           </div>
         </aside>
@@ -662,7 +665,7 @@ export default function App() {
               onClose={() => setActiveSectionId(null)}
               onZoomMedia={handleZoomMedia}
               onOpenCitation={handleOpenCitation}
-              maxHeight="85vh"
+              maxHeightPx={Math.max(260, Math.round(viewportHeight * 0.85))}
             />
           </div>
         </div>
@@ -692,7 +695,7 @@ export default function App() {
               onClose={() => setActiveFooterModalId(null)}
               onZoomMedia={handleZoomMedia}
               onOpenCitation={handleOpenCitation}
-              maxHeight="85vh"
+              maxHeightPx={Math.max(260, Math.round(viewportHeight * 0.85))}
             />
           </div>
         </div>

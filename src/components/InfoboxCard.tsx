@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ExternalLink, Image as ImageIcon, Maximize2 } from 'lucide-react';
 import { GuideSection } from '../data/guideContent';
 import { FormattedText } from './FormattedText';
@@ -14,10 +14,10 @@ interface InfoboxCardProps {
   pointerSide?: 'left' | 'right' | null;
   /** Vertical offset (in px from card top) for the speech triangle pointer */
   pointerOffsetTop?: number;
-  /** Optional CSS max-height cap so the card never extends past the viewport while keeping pagination pinned */
+  /** Numeric pixel max-height cap so images scale as large as possible without overflowing the viewport */
+  maxHeightPx?: number;
+  /** Optional CSS max-height fallback */
   maxHeight?: string;
-  /** Slightly more compact media height cap for cards anchored underneath top-right buttons */
-  compactMedia?: boolean;
   className?: string;
 }
 
@@ -174,13 +174,23 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
   onOpenCitation,
   pointerSide = null,
   pointerOffsetTop = 28,
+  maxHeightPx,
   maxHeight,
-  compactMedia = false,
   className = '',
 }) => {
   const [imgErrorBySrc, setImgErrorBySrc] = useState<Record<string, boolean>>({});
   const [altCaseSrcMap, setAltCaseSrcMap] = useState<Record<string, string>>({});
+  const [imgBoundsPx, setImgBoundsPx] = useState<{
+    maxWidth: number;
+    maxHeight: number | null;
+  } | null>(null);
+
+  const headerRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef = useRef<HTMLDivElement>(null);
+  const textSectionRef = useRef<HTMLDivElement>(null);
+  const captionRef = useRef<HTMLParagraphElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+
   const totalPages = section.pages.length;
   const safeIndex = Math.min(Math.max(currentPage, 0), totalPages - 1);
   const page = section.pages[safeIndex];
@@ -192,7 +202,7 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
   }, [section.id, safeIndex]);
 
   const rawSrc = page.media?.src || '';
-    const candidateSrc = rawSrc ? altCaseSrcMap[rawSrc] ?? rawSrc : '';
+  const candidateSrc = rawSrc ? altCaseSrcMap[rawSrc] ?? rawSrc : '';
   const resolvedSrc = candidateSrc.startsWith('/assets/')
     ? `${import.meta.env.BASE_URL}${candidateSrc.slice(1)}`
     : candidateSrc;
@@ -201,6 +211,90 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
   const showMediaArea = Boolean(page.media);
   const effectiveCitationHandler =
     section.id === 'references' ? undefined : onOpenCitation;
+
+  // Dynamically compute exact maximum image width & height before paint so images fill
+  // full horizontal width whenever room permits, and scale down just enough on text-heavy
+  // pages so the infobox never extends off the bottom of the screen.
+  useLayoutEffect(() => {
+    if (!showMediaArea) {
+      setImgBoundsPx(null);
+      return;
+    }
+
+    const computeBudget = () => {
+      const headerEl = headerRef.current;
+      const bodyEl = bodyScrollRef.current;
+      if (!headerEl || !bodyEl) return;
+
+      const cs = window.getComputedStyle(bodyEl);
+      const bodyPadX =
+        (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      const bodyPadY =
+        (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const bodyGap = parseFloat(cs.rowGap) || 10;
+
+      const innerWidth = Math.max(
+        140,
+        Math.floor(headerEl.clientWidth - bodyPadX - 2)
+      );
+
+      if (!maxHeightPx) {
+        setImgBoundsPx((prev) =>
+          prev && prev.maxWidth === innerWidth && prev.maxHeight === null
+            ? prev
+            : { maxWidth: innerWidth, maxHeight: null }
+        );
+        return;
+      }
+
+      const textEl = textSectionRef.current;
+      const captionEl = captionRef.current;
+      const footerEl = footerRef.current;
+
+      const outerBorders = 4;
+      const headerH = headerEl.offsetHeight;
+      const footerH = footerEl ? footerEl.offsetHeight : 0;
+      const textH = textEl ? textEl.offsetHeight : 0;
+      const gapBeforeMedia = textH > 0 ? bodyGap : 0;
+      const mediaBorder = 2;
+      const captionH = captionEl ? 6 + captionEl.offsetHeight : 0;
+      const safetyBuffer = 4;
+
+      const nonImageHeight =
+        outerBorders +
+        headerH +
+        bodyPadY +
+        textH +
+        gapBeforeMedia +
+        mediaBorder +
+        captionH +
+        footerH +
+        safetyBuffer;
+
+      const nextMaxHeight = Math.max(
+        115,
+        Math.floor(maxHeightPx - nonImageHeight)
+      );
+
+      setImgBoundsPx((prev) =>
+        prev &&
+        prev.maxWidth === innerWidth &&
+        prev.maxHeight === nextMaxHeight
+          ? prev
+          : { maxWidth: innerWidth, maxHeight: nextMaxHeight }
+      );
+    };
+
+    computeBudget();
+
+    const ro = new ResizeObserver(() => {
+      computeBudget();
+    });
+    if (headerRef.current) ro.observe(headerRef.current);
+    if (textSectionRef.current) ro.observe(textSectionRef.current);
+    if (captionRef.current) ro.observe(captionRef.current);
+    return () => ro.disconnect();
+  }, [showMediaArea, maxHeightPx, section.id, safeIndex, totalPages]);
 
   const toggleFilenameFirstLetterCase = (src: string): string | null => {
     const slashIdx = src.lastIndexOf('/');
@@ -214,11 +308,14 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
     return `${dir}${toggled}${file.slice(1)}`;
   };
 
+  const effectiveMaxHeight =
+    maxHeight ?? (maxHeightPx ? `${maxHeightPx}px` : undefined);
+
   return (
     <div
       role="dialog"
       aria-label={`${section.title} guide information`}
-      style={maxHeight ? { maxHeight } : undefined}
+      style={effectiveMaxHeight ? { maxHeight: effectiveMaxHeight } : undefined}
       className={`font-guide relative flex flex-col bg-[#f7f6f0] text-slate-800 border-2 border-slate-900 rounded-[4px] shadow-[6px_6px_0px_#0f172a] ${className}`}
     >
       {/* Right-pointing speech triangle (used when infobox sits on the left side of the page) */}
@@ -254,7 +351,10 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
       )}
 
       {/* Dark Header (Area title only + Pixelated corner X button) */}
-      <div className="shrink-0 bg-[#1e212b] text-white px-4 py-2.5 flex items-center justify-between gap-3 rounded-t-[2px] border-b-2 border-slate-900">
+      <div
+        ref={headerRef}
+        className="shrink-0 bg-[#1e212b] text-white px-4 py-2.5 flex items-center justify-between gap-3 rounded-t-[2px] border-b-2 border-slate-900"
+      >
         <h2 className="text-sm sm:text-[15px] font-bold text-white leading-snug">
           {section.title}
         </h2>
@@ -276,98 +376,100 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
           totalPages > 1 ? 'pb-2' : 'pb-4'
         } flex flex-col gap-2.5`}
       >
-        {page.subtitle && (
-          <h3 className="text-[15px] font-bold text-slate-900 leading-snug">
-            <FormattedText
-              text={page.subtitle}
-              onOpenCitation={effectiveCitationHandler}
-            />
-          </h3>
-        )}
-
-        {/* Paragraphs */}
-        <div className="space-y-2 text-[13.5px] text-slate-800 leading-[1.52]">
-          {page.paragraphs.map((text, idx) => (
-            <p
-              key={idx}
-              className={
-                page.hangingIndent ? 'pl-7 -indent-7 break-words' : undefined
-              }
-            >
+        <div ref={textSectionRef} className="flex flex-col gap-2.5">
+          {page.subtitle && (
+            <h3 className="text-[15px] font-bold text-slate-900 leading-snug">
               <FormattedText
-                text={text}
+                text={page.subtitle}
                 onOpenCitation={effectiveCitationHandler}
               />
-            </p>
-          ))}
-        </div>
-
-        {/* Optional Bullet Points */}
-        {page.bullets && page.bullets.length > 0 && (
-          <ul className="space-y-1 text-[13px] text-slate-800 list-disc pl-5 leading-[1.48]">
-            {page.bullets.map((item, idx) => (
-              <li key={idx}>
-                <FormattedText text={item} onOpenCitation={onOpenCitation} />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Optional Paragraphs Below Bullet Points */}
-        {page.paragraphsAfterBullets &&
-          page.paragraphsAfterBullets.length > 0 && (
-            <div className="space-y-2 text-[13.5px] text-slate-800 leading-[1.52]">
-              {page.paragraphsAfterBullets.map((text, idx) => (
-                <p key={idx}>
-                  <FormattedText text={text} onOpenCitation={onOpenCitation} />
-                </p>
-              ))}
-            </div>
+            </h3>
           )}
 
-        {/* Optional Source / Reference Links */}
-        {page.links && page.links.length > 0 && (
-          <ul className="space-y-2.5 text-[13px] text-slate-800 pt-0.5">
-            {page.links.map((item, idx) => (
-              <li
+          {/* Paragraphs */}
+          <div className="space-y-2 text-[13.5px] text-slate-800 leading-[1.52]">
+            {page.paragraphs.map((text, idx) => (
+              <p
                 key={idx}
-                className="rounded-[3px] border border-slate-300/80 bg-[#eeece3] px-3 py-2"
+                className={
+                  page.hangingIndent ? 'pl-7 -indent-7 break-words' : undefined
+                }
               >
-                {item.url ? (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 font-semibold text-[#d9482b] hover:underline leading-snug"
-                  >
-                    <span>
+                <FormattedText
+                  text={text}
+                  onOpenCitation={effectiveCitationHandler}
+                />
+              </p>
+            ))}
+          </div>
+
+          {/* Optional Bullet Points */}
+          {page.bullets && page.bullets.length > 0 && (
+            <ul className="space-y-1 text-[13px] text-slate-800 list-disc pl-5 leading-[1.48]">
+              {page.bullets.map((item, idx) => (
+                <li key={idx}>
+                  <FormattedText text={item} onOpenCitation={onOpenCitation} />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Optional Paragraphs Below Bullet Points */}
+          {page.paragraphsAfterBullets &&
+            page.paragraphsAfterBullets.length > 0 && (
+              <div className="space-y-2 text-[13.5px] text-slate-800 leading-[1.52]">
+                {page.paragraphsAfterBullets.map((text, idx) => (
+                  <p key={idx}>
+                    <FormattedText text={text} onOpenCitation={onOpenCitation} />
+                  </p>
+                ))}
+              </div>
+            )}
+
+          {/* Optional Source / Reference Links */}
+          {page.links && page.links.length > 0 && (
+            <ul className="space-y-2.5 text-[13px] text-slate-800 pt-0.5">
+              {page.links.map((item, idx) => (
+                <li
+                  key={idx}
+                  className="rounded-[3px] border border-slate-300/80 bg-[#eeece3] px-3 py-2"
+                >
+                  {item.url ? (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 font-semibold text-[#d9482b] hover:underline leading-snug"
+                    >
+                      <span>
+                        <FormattedText
+                          text={item.label}
+                          onOpenCitation={onOpenCitation}
+                        />
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="font-semibold text-slate-900 leading-snug block">
                       <FormattedText
                         text={item.label}
                         onOpenCitation={onOpenCitation}
                       />
                     </span>
-                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                  </a>
-                ) : (
-                  <span className="font-semibold text-slate-900 leading-snug block">
-                    <FormattedText
-                      text={item.label}
-                      onOpenCitation={onOpenCitation}
-                    />
-                  </span>
-                )}
-                {item.note && (
-                  <p className="mt-0.5 text-[12px] text-slate-600 leading-snug">
-                    <FormattedText
-                      text={item.note}
-                      onOpenCitation={onOpenCitation}
-                    />
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+                  )}
+                  {item.note && (
+                    <p className="mt-0.5 text-[12px] text-slate-600 leading-snug">
+                      <FormattedText
+                        text={item.note}
+                        onOpenCitation={onOpenCitation}
+                      />
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* Optional Image / GIF Slot (rendered below text) */}
         {showMediaArea && page.media && (
@@ -399,9 +501,17 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
                         [resolvedSrc]: true,
                       }));
                     }}
-                    className={`${
-                      compactMedia ? 'max-h-[156px]' : 'max-h-[200px]'
-                    } w-auto max-w-full h-auto block`}
+                    style={
+                      imgBoundsPx
+                        ? {
+                            maxWidth: `${imgBoundsPx.maxWidth}px`,
+                            ...(imgBoundsPx.maxHeight
+                              ? { maxHeight: `${imgBoundsPx.maxHeight}px` }
+                              : {}),
+                          }
+                        : undefined
+                    }
+                    className="w-auto max-w-full h-auto block"
                   />
                   {onZoomMedia && (
                     <button
@@ -414,10 +524,10 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
                         )
                       }
                       aria-label="Enlarge image or GIF"
-                      className="absolute bottom-2 right-2 flex items-center gap-1 rounded bg-slate-900/80 px-2 py-1 text-[11px] font-semibold text-white opacity-90 hover:opacity-100 hover:bg-slate-900 transition-opacity cursor-pointer"
+                      title="Expand image"
+                      className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded bg-slate-900/80 text-white opacity-90 hover:opacity-100 hover:bg-slate-900 transition-opacity cursor-pointer"
                     >
-                      <Maximize2 className="w-3 h-3" />
-                      <span>Expand</span>
+                      <Maximize2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
@@ -432,7 +542,10 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
             </div>
 
             {page.media.caption && (
-              <p className="text-[11.5px] text-slate-600 leading-[1.38]">
+              <p
+                ref={captionRef}
+                className="text-[11.5px] text-slate-600 leading-[1.38]"
+              >
                 <FormattedText
                   text={page.media.caption}
                   onOpenCitation={onOpenCitation}
@@ -445,7 +558,10 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
 
       {/* Pinned Minimalist Footer Pagination: Sideways Pixelated Triangles + "x of x" */}
       {totalPages > 1 && (
-        <div className="shrink-0 px-4 sm:px-5 pt-1 pb-3.5 bg-[#f7f6f0] rounded-b-[2px] flex items-center justify-between gap-2 select-none">
+        <div
+          ref={footerRef}
+          className="shrink-0 px-4 sm:px-5 pt-1 pb-3.5 bg-[#f7f6f0] rounded-b-[2px] flex items-center justify-between gap-2 select-none"
+        >
           <button
             type="button"
             disabled={safeIndex === 0}
