@@ -192,7 +192,11 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
   }, [section.id, safeIndex]);
 
   const rawSrc = page.media?.src || '';
-  const resolvedSrc = rawSrc ? altCaseSrcMap[rawSrc] ?? rawSrc : '';
+    const candidateSrc = rawSrc ? altCaseSrcMap[rawSrc] ?? rawSrc : '';
+  const resolvedSrc = candidateSrc.startsWith('/assets/')
+    ? `${import.meta.env.BASE_URL}${candidateSrc.slice(1)}`
+    : candidateSrc;
+
   const hasValidImage = Boolean(resolvedSrc && !imgErrorBySrc[resolvedSrc]);
   const showMediaArea = Boolean(page.media);
   const effectiveCitationHandler =
