@@ -1,0 +1,195 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #5a657e;
+    color: #f0e6d7;
+    font-family: 'Lato', sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.font-guide {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.font-itch {
+  font-family: 'Lato', sans-serif;
+}
+
+.font-pixel {
+  font-family: 'Silkscreen', monospace;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================================================
+   PURE CSS STEPPED PIXELATED BUTTONS
+   Uses axis-aligned 3px stepped box-shadows for razor-sharp notched pixel
+   corners and inner 3D bevel lighting, with minimal shift on press.
+   ============================================================================ */
+.px-btn {
+  --px-bg: #f7f6f0;
+  --px-fg: #0f172a;
+  --px-border: #0f172a;
+  --px-hi: #ffffff;
+  --px-lo: #d3d0c5;
+  --px-drop: rgba(15, 23, 42, 0.45);
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  margin: 3px;
+  background-color: var(--px-bg);
+  color: var(--px-fg);
+  cursor: pointer;
+  user-select: none;
+  image-rendering: pixelated;
+  box-shadow:
+    inset 0 3px 0 0 var(--px-hi),
+    inset 3px 0 0 0 var(--px-hi),
+    inset 0 -3px 0 0 var(--px-lo),
+    inset -3px 0 0 0 var(--px-lo),
+    0 -3px 0 0 var(--px-border),
+    0 3px 0 0 var(--px-border),
+    -3px 0 0 0 var(--px-border),
+    3px 0 0 0 var(--px-border),
+    0 5px 0 0 var(--px-drop);
+  transition: background-color 80ms linear, color 80ms linear, box-shadow 60ms linear, transform 50ms linear;
+}
+
+.px-btn:hover,
+.px-btn[data-active="true"] {
+  background-color: var(--px-hover-bg, var(--px-bg));
+  color: var(--px-hover-fg, var(--px-fg));
+  box-shadow:
+    inset 0 3px 0 0 var(--px-hover-hi, var(--px-hi)),
+    inset 3px 0 0 0 var(--px-hover-hi, var(--px-hi)),
+    inset 0 -3px 0 0 var(--px-hover-lo, var(--px-lo)),
+    inset -3px 0 0 0 var(--px-hover-lo, var(--px-lo)),
+    0 -3px 0 0 var(--px-border),
+    0 3px 0 0 var(--px-border),
+    -3px 0 0 0 var(--px-border),
+    3px 0 0 0 var(--px-border),
+    0 5px 0 0 var(--px-drop);
+}
+
+/* Minimal 1px press settle while clearly inverting bevel lighting */
+.px-btn:active {
+  transform: translateY(1px);
+  background-color: var(--px-active-bg, var(--px-hover-bg, var(--px-bg)));
+  color: var(--px-hover-fg, var(--px-fg));
+  box-shadow:
+    inset 0 3px 0 0 var(--px-hover-lo, var(--px-lo)),
+    inset 3px 0 0 0 var(--px-hover-lo, var(--px-lo)),
+    inset 0 -2px 0 0 var(--px-hover-hi, var(--px-hi)),
+    inset -2px 0 0 0 var(--px-hover-hi, var(--px-hi)),
+    0 -3px 0 0 var(--px-border),
+    0 3px 0 0 var(--px-border),
+    -3px 0 0 0 var(--px-border),
+    3px 0 0 0 var(--px-border),
+    0 4px 0 0 var(--px-drop);
+}
+
+.px-btn:focus-visible {
+  outline: 2px dashed #93c5fd;
+  outline-offset: 5px;
+}
+
+/* Crisp Cream Question Mark Button -> Royal Blue on hover/open */
+.px-btn-question {
+  --px-bg: #f7f6f0;
+  --px-fg: #0f172a;
+  --px-hi: #ffffff;
+  --px-lo: #d3d0c5;
+  --px-border: #0f172a;
+  --px-hover-bg: #2563eb;
+  --px-hover-fg: #ffffff;
+  --px-hover-hi: #60a5fa;
+  --px-hover-lo: #1d4ed8;
+  --px-active-bg: #1d4ed8;
+}
+
+/* Lighter Slate-Gray Pixel Close ("X") button inside dark infobox header (same 3px border scale) */
+.px-btn-close {
+  --px-bg: #9698aa;
+  --px-fg: #11141d;
+  --px-hi: #b9bbca;
+  --px-lo: #6e7083;
+  --px-border: #0b0d13;
+  --px-drop: rgba(0, 0, 0, 0.35);
+  --px-hover-bg: #fa5c5c;
+  --px-hover-fg: #ffffff;
+  --px-hover-hi: #ff8c8c;
+  --px-hover-lo: #c93b3b;
+  --px-active-bg: #e04848;
+}
+
+/* Pixelated Darker-Gray Sideways Triangle Pagination Buttons */
+.px-tri-btn {
+  --tri-border: #1e2430;
+  --tri-fill: #5a6270;
+  --tri-hi: #8791a2;
+  --tri-lo: #3d434f;
+  transition: transform 50ms linear, opacity 120ms ease;
+}
+
+.px-tri-btn:hover:not(:disabled) {
+  --tri-border: #0f172a;
+  --tri-fill: #3b4252;
+  --tri-hi: #6b768c;
+  --tri-lo: #232833;
+}
+
+.px-tri-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  --tri-border: #0f172a;
+  --tri-fill: #2f3542;
+  --tri-hi: #1f242e;
+  --tri-lo: #687387;
+}
+
+/* ============================================================================
+   SIDEWAYS INFOBOX EMERGENCE ANIMATIONS ("coming out of the page")
+   ============================================================================ */
+@keyframes infobox-emerge-left {
+  0% {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes infobox-emerge-right {
+  0% {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-emerge-left {
+  animation: infobox-emerge-left 190ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-emerge-right {
+  animation: infobox-emerge-right 190ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

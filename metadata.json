@@ -1,0 +1,8 @@
+{
+  "name": "Remix Backup of backup of Itch.io Visual Novel Page Guide",
+  "description": "An interactive genre guide introducing the structure and features of itch.io game pages for visual novels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
