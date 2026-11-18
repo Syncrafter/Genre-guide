@@ -255,27 +255,27 @@ export interface CommentOverride {
  */
 export const COMMENT_OVERRIDES: CommentOverride[] = [
   // 0 — Top comment 1: "Played this with my partner last weekend..."
-  { avatarSrc: '/assets/Timber_pfp.jpeg', authorName: '' },
+  { avatarSrc: `${import.meta.env.BASE_URL}assets/timber_pfp.jpeg`, authorName: '' },
   // 1 — Creator reply 1: "ty!!"
   { avatarSrc: '', authorName: '' },
 
   // 2 — Top comment 2: "赞！！超赞！！！"
-  { avatarSrc: '/assets/Default_pfp1.png', authorName: '' },
+  { avatarSrc: `${import.meta.env.BASE_URL}assets/Default_pfp1.png`, authorName: '' },
   // 3 — Creator reply 2: "❤️❤️"
   { avatarSrc: '', authorName: '' },
 
   // 4 — Top comment 3: "Hi developer! i really love your game..."
-  { avatarSrc: '/assets/Alula_pfp.webp', authorName: '' },
+  { avatarSrc: `${import.meta.env.BASE_URL}assets/Alula_pfp.webp`, authorName: '' },
   // 5 — Creator reply 3: "Dm me in discord! I’m @pietatosalad"
   { avatarSrc: '', authorName: '' },
 
   // 6 — Top comment 4: "why do i feel so much for these characters 😭😭😭..."
-  { avatarSrc: '/assets/Default_pfp2.png', authorName: '' },
+  { avatarSrc: `${import.meta.env.BASE_URL}assets/Default_pfp2.png`, authorName: '' },
   // 7 — Creator reply 4: "Haha there’s more of them coming soon!!"
   { avatarSrc: '', authorName: '' },
 
   // 8 — Top comment 5: "Beautiful storytelling and cozy art style, 10/10..."
-  { avatarSrc: '/assets/Default_pfp3.png', authorName: '' },
+  { avatarSrc: `${import.meta.env.BASE_URL}assets/Default_pfp3.png`, authorName: '' },
   // 9 — Creator reply 5: "Glad to hear you’re enjoying it!"
   { avatarSrc: '', authorName: '' },
 ];
