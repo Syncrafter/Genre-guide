@@ -255,7 +255,7 @@ export interface CommentOverride {
  */
 export const COMMENT_OVERRIDES: CommentOverride[] = [
   // 0 — Top comment 1: "Played this with my partner last weekend..."
-  { avatarSrc: `${import.meta.env.BASE_URL}assets/timber_pfp.jpeg`, authorName: '' },
+  { avatarSrc: `${import.meta.env.BASE_URL}assets/Timber_pfp.jpeg`, authorName: '' },
   // 1 — Creator reply 1: "ty!!"
   { avatarSrc: '', authorName: '' },
 
