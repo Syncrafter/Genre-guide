@@ -13,7 +13,7 @@ import { PageSectionId, TopButtonId } from '../data/guideContent';
  *    the overlay components when updating your mock HTML!
  * ============================================================================
  */
-export const MOCK_PAGE_HTML_PATH = '/mock-itch-page.html';
+export const MOCK_PAGE_HTML_PATH = `${import.meta.env.BASE_URL}mock-itch-page.html`;
 
 export interface CornerButtonMapping {
   id: TopButtonId;
