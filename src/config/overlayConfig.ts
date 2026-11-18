@@ -64,7 +64,7 @@ export const CORNER_BUTTON_MAPPINGS: CornerButtonMapping[] = [
   {
     id: 'creatingAndEditing',
     selector: '#user_tools .add_to_collection_btn',
-    fullLabel: 'Creating and editing your itch.io page',
+    fullLabel: 'Creating and editing\nyour itch.io page',
     mobileLabel: 'Creating pages',
     icon: 'paintbrush',
   },
@@ -228,3 +228,55 @@ export const FALLBACK_MORE_INFO_HTML = `
   </table>
 </div>
 `;
+
+export interface CommentOverride {
+  /**
+   * Image URL or path in /public/assets/... (e.g. '/assets/pfp1.png').
+   * Leave empty '' to keep the original PFP from mock-itch-page.html.
+   */
+  avatarSrc?: string;
+  /**
+   * Optional display name if you also want to change the commenter's username.
+   * Leave empty '' to keep the original username ('5a1ad').
+   */
+  authorName?: string;
+}
+
+/**
+ * ============================================================================
+ * COMMENT SECTION PROFILE PICTURES (PFPs) & USERNAMES
+ * ============================================================================
+ * Because `public/mock-itch-page.html` is a minified SingleFile export, you can
+ * easily change the PFP (and optionally username) for each comment right here!
+ *
+ * 1. Upload your PFP images into `public/assets/` (e.g. `public/assets/pfp1.png`).
+ * 2. Set `avatarSrc: '/assets/pfp1.png'` on whichever comment(s) below you want to change.
+ * ============================================================================
+ */
+export const COMMENT_OVERRIDES: CommentOverride[] = [
+  // 0 — Top comment 1: "Played this with my partner last weekend..."
+  { avatarSrc: '/assets/Timber_pfp.jpeg', authorName: '' },
+  // 1 — Creator reply 1: "ty!!"
+  { avatarSrc: '', authorName: '' },
+
+  // 2 — Top comment 2: "赞！！超赞！！！"
+  { avatarSrc: '/assets/Default_pfp1.png', authorName: '' },
+  // 3 — Creator reply 2: "❤️❤️"
+  { avatarSrc: '', authorName: '' },
+
+  // 4 — Top comment 3: "Hi developer! i really love your game..."
+  { avatarSrc: '/assets/Alula_pfp.webp', authorName: '' },
+  // 5 — Creator reply 3: "Dm me in discord! I’m @pietatosalad"
+  { avatarSrc: '', authorName: '' },
+
+  // 6 — Top comment 4: "why do i feel so much for these characters 😭😭😭..."
+  { avatarSrc: '/assets/Default_pfp2.png', authorName: '' },
+  // 7 — Creator reply 4: "Haha there’s more of them coming soon!!"
+  { avatarSrc: '', authorName: '' },
+
+  // 8 — Top comment 5: "Beautiful storytelling and cozy art style, 10/10..."
+  { avatarSrc: '/assets/Default_pfp3.png', authorName: '' },
+  // 9 — Creator reply 5: "Glad to hear you’re enjoying it!"
+  { avatarSrc: '', authorName: '' },
+];
+

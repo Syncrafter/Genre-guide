@@ -34,10 +34,20 @@ interface ActiveCitationState {
   anchorRect: CitationAnchorRect;
 }
 
+interface SectionSpawnAnchor {
+  /** Stage-relative Y of the clicked element when triggered inside a section (null if opened via "?" button) */
+  triggerStageY: number | null;
+  /** Stage-relative top edge of the visible browser viewport at trigger time */
+  viewportStageTop: number;
+  /** Visible browser viewport height at trigger time */
+  viewportHeight: number;
+}
+
 const DESKTOP_SIDE_RAIL_MIN_WIDTH = 1340;
 const SIDE_CARD_WIDTH = 344;
 const SIDE_CARD_GAP = 18;
 const SCREEN_EDGE_MARGIN = 14;
+const VIEWPORT_VERTICAL_MARGIN = 16;
 
 /** Sections on the right column of the itch.io page open their popup on the right side */
 function isRightSideSection(sectionId: PageSectionId | null): boolean {
@@ -70,9 +80,12 @@ export default function App() {
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [cornerAnchor, setCornerAnchor] = useState<CornerAnchorRect | null>(null);
 
-  // Viewport width for responsive side-rail calculations
+  // Viewport dimensions for responsive side-rail and height-clamping calculations
   const [viewportWidth, setViewportWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1440
+  );
+  const [viewportHeight, setViewportHeight] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerHeight : 900
   );
 
   // Measured stage metrics & all section bounding boxes from InteractiveOverlay
@@ -86,18 +99,82 @@ export default function App() {
   // Measured height of the currently open desktop side card for viewport clamping
   const [sideCardHeight, setSideCardHeight] = useState<number>(340);
 
+  // Viewport + trigger anchor snapshot captured whenever a section infobox opens,
+  // re-triggers from another element, or flips pages so it always spawns in-frame
+  const [sectionSpawnAnchor, setSectionSpawnAnchor] =
+    useState<SectionSpawnAnchor | null>(null);
+
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const sideCardRef = useRef<HTMLDivElement>(null);
   const lastTriggeredSourceRef = useRef<string | null>(null);
+  const activeSectionIdRef = useRef<PageSectionId | null>(null);
+  activeSectionIdRef.current = activeSectionId;
 
   const setStageNode = useCallback((node: HTMLDivElement | null) => {
     stageRef.current = node;
     setStageEl(node);
   }, []);
 
+  const captureSpawnAnchor = useCallback(
+    (triggerClientY?: number): SectionSpawnAnchor => {
+      const stageRect = stageRef.current?.getBoundingClientRect();
+      const viewportStageTop = stageRect
+        ? -stageRect.top
+        : typeof window !== 'undefined'
+          ? window.scrollY
+          : 0;
+      const viewportHeight =
+        typeof window !== 'undefined' ? window.innerHeight : 900;
+      const triggerStageY =
+        triggerClientY !== undefined && stageRect
+          ? triggerClientY - stageRect.top
+          : null;
+      return {
+        triggerStageY,
+        viewportStageTop,
+        viewportHeight,
+      };
+    },
+    []
+  );
+
+  const refreshSectionViewportBounds = useCallback(() => {
+    if (!stageRef.current || typeof window === 'undefined') return;
+    const stageRect = stageRef.current.getBoundingClientRect();
+    setSectionSpawnAnchor((prev) => ({
+      triggerStageY: prev?.triggerStageY ?? null,
+      viewportStageTop: -stageRect.top,
+      viewportHeight: window.innerHeight,
+    }));
+  }, []);
+
+  const handleCornerAnchorChange = useCallback(
+    (next: CornerAnchorRect | null) => {
+      setCornerAnchor((prev) => {
+        if (prev === next) return prev;
+        if (!prev || !next) return next;
+        if (
+          prev.isBottomBar === next.isBottomBar &&
+          Math.abs(prev.top - next.top) < 0.5 &&
+          Math.abs(prev.right - next.right) < 0.5 &&
+          Math.abs(prev.bottom - next.bottom) < 0.5 &&
+          Math.abs(prev.left - next.left) < 0.5 &&
+          Math.abs(prev.width - next.width) < 0.5
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   useEffect(() => {
-    const onResize = () => setViewportWidth(window.innerWidth);
+    const onResize = () => {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -147,9 +224,13 @@ export default function App() {
   }, [isDesktopSideRail, activeSectionId]);
 
   // Compute exact side card coordinates synchronously from `stageMetrics.boxes[activeSectionId]`
-  // so the infobox NEVER starts at top=24 and drops vertically—it spawns directly at the
-  // section's vertical level and slides horizontally out of the page!
-  const computeDesktopSideCardCoords = (): { top: number; left: number } | null => {
+  // and `sectionSpawnAnchor` so the infobox ALWAYS spawns in-frame (both top & bottom of viewport)
+  // and aligns beside the clicked element or section.
+  const computeDesktopSideCardCoords = (): {
+    top: number;
+    left: number;
+    pointerOffsetTop: number;
+  } | null => {
     if (!isDesktopSideRail || !activeSectionId) return null;
     const box = stageMetrics.boxes[activeSectionId];
     if (!box) return null;
@@ -164,22 +245,52 @@ export default function App() {
           stageMetrics.innerColumnLeft - SIDE_CARD_WIDTH - SIDE_CARD_GAP
         );
 
-    const rawTop = box.top;
-    const maxStageTop = Math.max(12, stageMetrics.stageHeight - sideCardHeight - 20);
+    const anchor = sectionSpawnAnchor ?? captureSpawnAnchor();
 
-    let adjustedTop = rawTop;
-    if (stageRef.current && typeof window !== 'undefined') {
-      const stageRect = stageRef.current.getBoundingClientRect();
-      const sectionViewportTop = stageRect.top + box.top;
-      const maxViewportVisibleTop =
-        window.innerHeight - stageRect.top - sideCardHeight - 20;
-      if (sectionViewportTop > window.innerHeight - sideCardHeight - 20) {
-        adjustedTop = Math.min(rawTop, Math.max(12, maxViewportVisibleTop));
-      }
+    // Start at the section top (when opened via "?") or aligned near the clicked element
+    let preferredTop = box.top;
+    if (anchor.triggerStageY !== null) {
+      const sectionMinTop = box.top;
+      const sectionMaxTop = Math.max(
+        box.top,
+        box.top + box.height - sideCardHeight
+      );
+      preferredTop = Math.max(
+        sectionMinTop,
+        Math.min(anchor.triggerStageY - 38, sectionMaxTop)
+      );
     }
 
-    const top = Math.max(12, Math.min(adjustedTop, maxStageTop));
-    return { top, left };
+    // Clamp strictly into the visible browser viewport [minVisibleTop, maxVisibleTop]
+    const minVisibleTop = anchor.viewportStageTop + VIEWPORT_VERTICAL_MARGIN;
+    const maxVisibleTop =
+      anchor.viewportStageTop +
+      anchor.viewportHeight -
+      sideCardHeight -
+      VIEWPORT_VERTICAL_MARGIN;
+
+    const inFrameTop =
+      maxVisibleTop >= minVisibleTop
+        ? Math.max(minVisibleTop, Math.min(preferredTop, maxVisibleTop))
+        : minVisibleTop;
+
+    const top = Math.max(12, inFrameTop);
+
+    // Keep the speech pointer aimed at the highlighted section even when viewport
+    // clamping lifts the card above a compact section near the bottom of the screen
+    let pointerOffsetTop = 28;
+    if (top + 28 < box.top) {
+      const targetStageY = box.top + Math.min(24, box.height / 2);
+      pointerOffsetTop = Math.max(
+        54,
+        Math.min(
+          Math.max(54, sideCardHeight - 30),
+          Math.round(targetStageY - top)
+        )
+      );
+    }
+
+    return { top, left, pointerOffsetTop };
   };
 
   // Close open citation popup whenever switching sections, pages, or modals
@@ -232,8 +343,10 @@ export default function App() {
       } else if (activeSectionId) {
         const total = SECTION_GUIDES[activeSectionId].pages.length;
         if (e.key === 'ArrowRight') {
+          refreshSectionViewportBounds();
           setSectionPageIndex((i) => Math.min(total - 1, i + 1));
         } else if (e.key === 'ArrowLeft') {
+          refreshSectionViewportBounds();
           setSectionPageIndex((i) => Math.max(0, i - 1));
         }
       }
@@ -246,39 +359,80 @@ export default function App() {
     activeFooterModalId,
     activeSectionId,
     activeTopButtonId,
+    refreshSectionViewportBounds,
     zoomedMedia,
   ]);
 
-  const handleSelectSection = useCallback((sectionId: PageSectionId) => {
-    lastTriggeredSourceRef.current = null;
-    setActiveTopButtonId(null);
-    setActiveFooterModalId(null);
-    setActiveSectionId((prev) => {
-      if (prev === sectionId) return null;
-      setSectionPageIndex(0);
-      return sectionId;
-    });
-  }, []);
+  const handleSectionPageChange = useCallback(
+    (nextPage: number) => {
+      refreshSectionViewportBounds();
+      setSectionPageIndex(nextPage);
+    },
+    [refreshSectionViewportBounds]
+  );
 
-  const handleTriggerSectionFromElement = useCallback(
-    (sectionId: PageSectionId, sourceKey: string) => {
+  const handleSelectSection = useCallback(
+    (sectionId: PageSectionId) => {
+      const prev = activeSectionIdRef.current;
+      lastTriggeredSourceRef.current = null;
       setActiveTopButtonId(null);
       setActiveFooterModalId(null);
-      setActiveSectionId((prev) => {
-        if (prev === sectionId) {
-          if (lastTriggeredSourceRef.current === sourceKey) {
-            lastTriggeredSourceRef.current = null;
-            return null;
+
+      if (prev === sectionId) {
+        // If the open desktop card was scrolled completely out of frame, bring it into frame instead of closing
+        if (sideCardRef.current && typeof window !== 'undefined') {
+          const cardRect = sideCardRef.current.getBoundingClientRect();
+          const isOutOfFrame =
+            cardRect.bottom < 48 || cardRect.top > window.innerHeight - 48;
+          if (isOutOfFrame) {
+            setSectionSpawnAnchor(captureSpawnAnchor());
+            return;
           }
-          lastTriggeredSourceRef.current = sourceKey;
-          return prev;
+        }
+        setActiveSectionId(null);
+        return;
+      }
+
+      setSectionSpawnAnchor(captureSpawnAnchor());
+      setSectionPageIndex(0);
+      setActiveSectionId(sectionId);
+    },
+    [captureSpawnAnchor]
+  );
+
+  const handleTriggerSectionFromElement = useCallback(
+    (sectionId: PageSectionId, sourceKey: string, triggerClientY?: number) => {
+      const prev = activeSectionIdRef.current;
+      setActiveTopButtonId(null);
+      setActiveFooterModalId(null);
+
+      if (prev === sectionId) {
+        if (lastTriggeredSourceRef.current === sourceKey) {
+          // If the open desktop card was scrolled out of frame, pull it into frame instead of closing it unseen
+          if (sideCardRef.current && typeof window !== 'undefined') {
+            const cardRect = sideCardRef.current.getBoundingClientRect();
+            const isOutOfFrame =
+              cardRect.bottom < 48 || cardRect.top > window.innerHeight - 48;
+            if (isOutOfFrame) {
+              setSectionSpawnAnchor(captureSpawnAnchor(triggerClientY));
+              return;
+            }
+          }
+          lastTriggeredSourceRef.current = null;
+          setActiveSectionId(null);
+          return;
         }
         lastTriggeredSourceRef.current = sourceKey;
-        setSectionPageIndex(0);
-        return sectionId;
-      });
+        setSectionSpawnAnchor(captureSpawnAnchor(triggerClientY));
+        return;
+      }
+
+      lastTriggeredSourceRef.current = sourceKey;
+      setSectionSpawnAnchor(captureSpawnAnchor(triggerClientY));
+      setSectionPageIndex(0);
+      setActiveSectionId(sectionId);
     },
-    []
+    [captureSpawnAnchor]
   );
 
   const handleSelectTopButton = useCallback((buttonId: TopButtonId) => {
@@ -343,7 +497,7 @@ export default function App() {
         <div
           key={activeTopButtonId}
           data-infobox-container="true"
-          className="fixed bottom-[58px] left-3 right-3 z-40 mx-auto max-w-[400px] max-h-[calc(100vh-76px)] overflow-y-auto animate-emerge-left"
+          className="fixed bottom-[58px] left-3 right-3 z-40 mx-auto max-w-[420px] animate-emerge-left"
         >
           <InfoboxCard
             section={TOP_BUTTON_GUIDES[activeTopButtonId]}
@@ -352,13 +506,18 @@ export default function App() {
             onClose={() => setActiveTopButtonId(null)}
             onZoomMedia={handleZoomMedia}
             onOpenCitation={handleOpenCitation}
+            maxHeight="calc(100vh - 76px)"
+            compactMedia
           />
         </div>
       );
     }
 
-    const topPx = cornerAnchor ? Math.max(12, cornerAnchor.bottom + 8) : 96;
+    const topPx = cornerAnchor ? Math.max(10, cornerAnchor.bottom + 7) : 94;
     const rightPx = cornerAnchor ? cornerAnchor.right : 10;
+    const maxCardHeight = isFixedDesktop
+      ? `calc(100vh - ${topPx + 14}px)`
+      : `${Math.max(260, Math.round(viewportHeight - topPx - 14))}px`;
 
     return (
       <div
@@ -371,7 +530,10 @@ export default function App() {
                 left: '12px',
               }
             : isFixedDesktop
-              ? { top: `${topPx}px`, right: `${rightPx}px` }
+              ? {
+                  top: `${topPx}px`,
+                  right: `${rightPx}px`,
+                }
               : {
                   top: `${topPx + (typeof window !== 'undefined' ? window.scrollY : 0)}px`,
                   right: `${rightPx}px`,
@@ -379,7 +541,7 @@ export default function App() {
         }
         className={`${
           isFixedDesktop ? 'fixed' : 'absolute'
-        } z-40 w-[min(395px,calc(100vw-24px))] animate-emerge-left`}
+        } z-40 w-[min(440px,calc(100vw-24px))] animate-emerge-left`}
       >
         <InfoboxCard
           section={TOP_BUTTON_GUIDES[activeTopButtonId]}
@@ -388,6 +550,8 @@ export default function App() {
           onClose={() => setActiveTopButtonId(null)}
           onZoomMedia={handleZoomMedia}
           onOpenCitation={handleOpenCitation}
+          maxHeight={maxCardHeight}
+          compactMedia
         />
       </div>
     );
@@ -410,7 +574,7 @@ export default function App() {
         onSelectTopButton={handleSelectTopButton}
         onTriggerSectionFromElement={handleTriggerSectionFromElement}
         onSelectFooterModal={handleSelectFooterModal}
-        onCornerAnchorChange={setCornerAnchor}
+        onCornerAnchorChange={handleCornerAnchorChange}
         onShadowReady={handleShadowReady}
         onLayoutChange={handleLayoutChange}
         leftRailShiftPx={leftRailShiftPx}
@@ -460,11 +624,13 @@ export default function App() {
             <InfoboxCard
               section={SECTION_GUIDES[activeSectionId]}
               currentPage={sectionPageIndex}
-              onPageChange={setSectionPageIndex}
+              onPageChange={handleSectionPageChange}
               onClose={() => setActiveSectionId(null)}
               onZoomMedia={handleZoomMedia}
               onOpenCitation={handleOpenCitation}
               pointerSide={opensOnRight ? 'left' : 'right'}
+              pointerOffsetTop={sideCoords.pointerOffsetTop}
+              maxHeight={`calc(100vh - ${VIEWPORT_VERTICAL_MARGIN * 2}px)`}
             />
           </div>
         </aside>
@@ -485,7 +651,7 @@ export default function App() {
           />
           <div
             key={activeSectionId}
-            className={`relative z-10 w-full max-w-[420px] max-h-[85vh] overflow-y-auto ${
+            className={`relative z-10 w-full max-w-[420px] ${
               opensOnRight ? 'animate-emerge-right' : 'animate-emerge-left'
             }`}
           >
@@ -496,6 +662,7 @@ export default function App() {
               onClose={() => setActiveSectionId(null)}
               onZoomMedia={handleZoomMedia}
               onOpenCitation={handleOpenCitation}
+              maxHeight="85vh"
             />
           </div>
         </div>
@@ -516,7 +683,7 @@ export default function App() {
           />
           <div
             key={activeFooterModalId}
-            className="relative z-10 w-full max-w-[460px] max-h-[85vh] overflow-y-auto animate-emerge-left"
+            className="relative z-10 w-full max-w-[460px] animate-emerge-left"
           >
             <InfoboxCard
               section={FOOTER_GUIDES[activeFooterModalId]}
@@ -525,6 +692,7 @@ export default function App() {
               onClose={() => setActiveFooterModalId(null)}
               onZoomMedia={handleZoomMedia}
               onOpenCitation={handleOpenCitation}
+              maxHeight="85vh"
             />
           </div>
         </div>

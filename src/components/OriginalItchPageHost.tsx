@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FooterModalId, PageSectionId, TopButtonId } from '../data/guideContent';
 import {
+  COMMENT_OVERRIDES,
   CORNER_BUTTON_MAPPINGS,
   FALLBACK_MORE_INFO_HTML,
   ITCHIO_CORNER_ICON_SVG,
@@ -24,7 +25,8 @@ interface OriginalItchPageHostProps {
   onSelectTopButton: (buttonId: TopButtonId) => void;
   onTriggerSectionFromElement: (
     sectionId: PageSectionId,
-    sourceKey: string
+    sourceKey: string,
+    triggerClientY?: number
   ) => void;
   onSelectFooterModal: (modalId: FooterModalId) => void;
   onCornerAnchorChange: (rect: CornerAnchorRect | null) => void;
@@ -60,18 +62,34 @@ const HOST_BRIDGE_CSS = `
     display: block;
   }
 }
-/* Keep modified #user_tools corner buttons crisp, readable, and interactive above overlays */
+/* Keep modified #user_tools corner buttons crisp, readable, and aligned along both left & right edges */
 @media (min-width: 961px) {
   .itch-body-root .user_tools {
     z-index: 35 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 8px;
+  }
+  .itch-body-root .user_tools > li {
+    display: flex;
+    margin-bottom: 7px;
+  }
+  .itch-body-root .user_tools > li:last-child {
+    margin-bottom: 0;
   }
   .itch-body-root .user_tools .action_btn {
-    font-size: 15.5px;
-    padding: 6px 11px;
-    line-height: 1.28;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 15px;
+    padding: 5px 11px;
+    line-height: 1.25;
     gap: 6px;
     max-width: 285px;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .itch-body-root .user_tools .action_btn .mobile_inline_space {
+    display: none;
   }
   .itch-body-root .user_tools .action_btn > svg {
     flex-shrink: 0;
@@ -376,10 +394,70 @@ export const OriginalItchPageHost: React.FC<OriginalItchPageHostProps> = ({
           });
         }
 
-        // Neutralize external hrefs/targets so all page links/buttons stay in-page and clickable
+        // Preserve original itch.io URLs for the bottom-right footer breadcrumb links
+        // ("Games", "Visual Novel", "$15 or less") before neutralizing in-page anchors
+        const breadcrumbHrefMap = new Map<HTMLAnchorElement, string>();
+        const breadcrumbFallbacks: Record<string, string> = {
+          games: 'https://itch.io/games',
+          'visual novel': 'https://itch.io/games/genre-visual-novel',
+          'visual novels': 'https://itch.io/games/genre-visual-novel',
+          '$15 or less': 'https://itch.io/games/15-dollars-or-less',
+        };
+        bodyWrapper
+          .querySelectorAll<HTMLAnchorElement>(
+            '#view_game_footer .breadcrumbs a, .footer .breadcrumbs a'
+          )
+          .forEach((anchor) => {
+            const origHref = anchor.getAttribute('href')?.trim() || '';
+            const labelKey = (anchor.textContent || '').trim().toLowerCase();
+            const resolvedHref =
+              origHref && origHref.startsWith('http')
+                ? origHref
+                : breadcrumbFallbacks[labelKey] || '';
+            if (resolvedHref) {
+              breadcrumbHrefMap.set(anchor, resolvedHref);
+            }
+          });
+
+        // Neutralize external hrefs/targets so all mock page links/buttons stay in-page and clickable
         bodyWrapper.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
           anchor.setAttribute('href', 'javascript:void(0)');
           anchor.removeAttribute('target');
+        });
+
+        // Restore real itch.io external links on the footer breadcrumbs
+        breadcrumbHrefMap.forEach((href, anchor) => {
+          anchor.setAttribute('href', href);
+          anchor.setAttribute('target', '_blank');
+          anchor.setAttribute('rel', 'noopener noreferrer');
+          anchor.setAttribute('data-external-link', 'true');
+        });
+
+        // Apply optional comment PFP & username overrides from overlayConfig.ts
+        const commentPosts = shadow.querySelectorAll<HTMLElement>('.community_post');
+        commentPosts.forEach((postEl, index) => {
+          const override = COMMENT_OVERRIDES[index];
+          if (!override) return;
+
+          if (override.avatarSrc && override.avatarSrc.trim()) {
+            const avatarEl = postEl.querySelector<HTMLElement>(
+              ':scope > .post_grid .post_avatar'
+            );
+            if (avatarEl) {
+              avatarEl.style.backgroundImage = `url("${override.avatarSrc.trim()}")`;
+              avatarEl.style.backgroundPosition = 'center';
+              avatarEl.style.backgroundSize = 'cover';
+            }
+          }
+
+          if (override.authorName && override.authorName.trim()) {
+            const authorLink = postEl.querySelector<HTMLElement>(
+              ':scope > .post_grid .post_author a'
+            );
+            if (authorLink) {
+              authorLink.textContent = override.authorName.trim();
+            }
+          }
         });
 
         // Customize the bottom footer: keep "itch.io" linking to https://itch.io/,
@@ -475,6 +553,18 @@ export const OriginalItchPageHost: React.FC<OriginalItchPageHostProps> = ({
               const lines = mapping.fullLabel.split('\n');
               lines.forEach((line, idx) => {
                 if (idx > 0) {
+                  const prevLine = lines[idx - 1];
+                  if (
+                    prevLine &&
+                    !prevLine.endsWith('/') &&
+                    !prevLine.endsWith('-') &&
+                    !prevLine.endsWith(' ')
+                  ) {
+                    const spaceSpan = document.createElement('span');
+                    spaceSpan.className = 'mobile_inline_space';
+                    spaceSpan.textContent = ' ';
+                    fullLabel.appendChild(spaceSpan);
+                  }
                   const br = document.createElement('br');
                   br.className = 'desktop_br';
                   fullLabel.appendChild(br);
@@ -555,18 +645,12 @@ export const OriginalItchPageHost: React.FC<OriginalItchPageHostProps> = ({
 
             const sectionId = resolveSectionForInteractiveElement(interactiveEl);
             if (sectionId) {
+              const elRect = interactiveEl.getBoundingClientRect();
+              const triggerCenterY = elRect.top + elRect.height / 2;
               callbacksRef.current.onTriggerSectionFromElement(
                 sectionId,
-                getElementKey(interactiveEl)
-              );
-              return;
-            }
-
-            // Footer breadcrumbs (Genre / Browse tags) -> More information guide
-            if (interactiveEl.closest('#view_game_footer .breadcrumbs')) {
-              callbacksRef.current.onTriggerSectionFromElement(
-                'moreInfo',
-                getElementKey(interactiveEl)
+                getElementKey(interactiveEl),
+                triggerCenterY
               );
               return;
             }

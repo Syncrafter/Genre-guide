@@ -122,7 +122,7 @@ export const CitationDialog: React.FC<CitationDialogProps> = ({
       {/* Compact Dark Header */}
       <div className="bg-[#1e212b] text-white px-3 py-2 flex items-center justify-between gap-2 rounded-t-[2px] border-b-2 border-slate-900">
         <span className="text-[12.5px] font-bold tracking-wide text-white">
-          {entry?.title || `Reference [${citationId}]`}
+          {entry?.title || 'Reference'}
         </span>
 
         <button
@@ -139,11 +139,8 @@ export const CitationDialog: React.FC<CitationDialogProps> = ({
       <div className="p-3.5 flex flex-col gap-2 text-[12.5px] text-slate-800 leading-relaxed">
         {entry ? (
           <>
-            <p className="break-words">
-              <FormattedText
-                text={entry.text}
-                onOpenCitation={onOpenCitation}
-              />
+            <p className="pl-6 -indent-6 break-words">
+              <FormattedText text={entry.text} />
             </p>
             {entry.url && (
               <a

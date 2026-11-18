@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ExternalLink, Image as ImageIcon, Maximize2 } from 'lucide-react';
 import { GuideSection } from '../data/guideContent';
 import { FormattedText } from './FormattedText';
@@ -12,6 +12,12 @@ interface InfoboxCardProps {
   onOpenCitation?: (citationId: number, anchorEl: HTMLElement) => void;
   /** Which side of the infobox points toward the mock page ('right' for left-side popups, 'left' for right-side screenshots popup) */
   pointerSide?: 'left' | 'right' | null;
+  /** Vertical offset (in px from card top) for the speech triangle pointer */
+  pointerOffsetTop?: number;
+  /** Optional CSS max-height cap so the card never extends past the viewport while keeping pagination pinned */
+  maxHeight?: string;
+  /** Slightly more compact media height cap for cards anchored underneath top-right buttons */
+  compactMedia?: boolean;
   className?: string;
 }
 
@@ -167,32 +173,62 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
   onZoomMedia,
   onOpenCitation,
   pointerSide = null,
+  pointerOffsetTop = 28,
+  maxHeight,
+  compactMedia = false,
   className = '',
 }) => {
-  const [imgError, setImgError] = useState<Record<number, boolean>>({});
+  const [imgErrorBySrc, setImgErrorBySrc] = useState<Record<string, boolean>>({});
+  const [altCaseSrcMap, setAltCaseSrcMap] = useState<Record<string, string>>({});
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
   const totalPages = section.pages.length;
   const safeIndex = Math.min(Math.max(currentPage, 0), totalPages - 1);
   const page = section.pages[safeIndex];
 
-  const hasValidImage = Boolean(page.media?.src && !imgError[safeIndex]);
-  const showMediaArea = Boolean(page.media && (hasValidImage || page.media.placeholderLabel));
+  useEffect(() => {
+    if (bodyScrollRef.current) {
+      bodyScrollRef.current.scrollTop = 0;
+    }
+  }, [section.id, safeIndex]);
+
+  const rawSrc = page.media?.src || '';
+  const resolvedSrc = rawSrc ? altCaseSrcMap[rawSrc] ?? rawSrc : '';
+  const hasValidImage = Boolean(resolvedSrc && !imgErrorBySrc[resolvedSrc]);
+  const showMediaArea = Boolean(page.media);
+  const effectiveCitationHandler =
+    section.id === 'references' ? undefined : onOpenCitation;
+
+  const toggleFilenameFirstLetterCase = (src: string): string | null => {
+    const slashIdx = src.lastIndexOf('/');
+    const dir = slashIdx >= 0 ? src.slice(0, slashIdx + 1) : '';
+    const file = slashIdx >= 0 ? src.slice(slashIdx + 1) : src;
+    if (!file) return null;
+    const first = file[0];
+    const toggled =
+      first === first.toUpperCase() ? first.toLowerCase() : first.toUpperCase();
+    if (toggled === first) return null;
+    return `${dir}${toggled}${file.slice(1)}`;
+  };
 
   return (
     <div
       role="dialog"
       aria-label={`${section.title} guide information`}
-      className={`font-guide relative bg-[#f7f6f0] text-slate-800 border-2 border-slate-900 rounded-[4px] shadow-[6px_6px_0px_#0f172a] ${className}`}
+      style={maxHeight ? { maxHeight } : undefined}
+      className={`font-guide relative flex flex-col bg-[#f7f6f0] text-slate-800 border-2 border-slate-900 rounded-[4px] shadow-[6px_6px_0px_#0f172a] ${className}`}
     >
       {/* Right-pointing speech triangle (used when infobox sits on the left side of the page) */}
       {pointerSide === 'right' && (
         <>
           <span
             aria-hidden="true"
-            className="block absolute top-7 -right-[14px] w-0 h-0 border-y-[10px] border-y-transparent border-l-[14px] border-l-slate-900 z-10"
+            style={{ top: `${pointerOffsetTop}px` }}
+            className="block absolute -right-[14px] w-0 h-0 border-y-[10px] border-y-transparent border-l-[14px] border-l-slate-900 z-10"
           />
           <span
             aria-hidden="true"
-            className="block absolute top-[30px] -right-[10px] w-0 h-0 border-y-[8px] border-y-transparent border-l-[11px] border-l-[#f7f6f0] z-20"
+            style={{ top: `${pointerOffsetTop + 2}px` }}
+            className="block absolute -right-[10px] w-0 h-0 border-y-[8px] border-y-transparent border-l-[11px] border-l-[#f7f6f0] z-20"
           />
         </>
       )}
@@ -202,17 +238,19 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
         <>
           <span
             aria-hidden="true"
-            className="block absolute top-7 -left-[14px] w-0 h-0 border-y-[10px] border-y-transparent border-r-[14px] border-r-slate-900 z-10"
+            style={{ top: `${pointerOffsetTop}px` }}
+            className="block absolute -left-[14px] w-0 h-0 border-y-[10px] border-y-transparent border-r-[14px] border-r-slate-900 z-10"
           />
           <span
             aria-hidden="true"
-            className="block absolute top-[30px] -left-[10px] w-0 h-0 border-y-[8px] border-y-transparent border-r-[11px] border-r-[#f7f6f0] z-20"
+            style={{ top: `${pointerOffsetTop + 2}px` }}
+            className="block absolute -left-[10px] w-0 h-0 border-y-[8px] border-y-transparent border-r-[11px] border-r-[#f7f6f0] z-20"
           />
         </>
       )}
 
       {/* Dark Header (Area title only + Pixelated corner X button) */}
-      <div className="bg-[#1e212b] text-white px-4 py-3 flex items-center justify-between gap-3 rounded-t-[2px] border-b-2 border-slate-900">
+      <div className="shrink-0 bg-[#1e212b] text-white px-4 py-2.5 flex items-center justify-between gap-3 rounded-t-[2px] border-b-2 border-slate-900">
         <h2 className="text-sm sm:text-[15px] font-bold text-white leading-snug">
           {section.title}
         </h2>
@@ -227,27 +265,42 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
         </button>
       </div>
 
-      {/* Crisp Cream Body (No dividing lines between heading, body text, and pagination) */}
-      <div className="p-4 sm:p-5 flex flex-col gap-3">
-        <h3 className="text-[15px] font-bold text-slate-900 leading-snug">
-          <FormattedText
-            text={page.subtitle}
-            onOpenCitation={onOpenCitation}
-          />
-        </h3>
+      {/* Crisp Cream Body (Scrolls internally only on very short screens while keeping pagination pinned) */}
+      <div
+        ref={bodyScrollRef}
+        className={`flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 pt-3.5 ${
+          totalPages > 1 ? 'pb-2' : 'pb-4'
+        } flex flex-col gap-2.5`}
+      >
+        {page.subtitle && (
+          <h3 className="text-[15px] font-bold text-slate-900 leading-snug">
+            <FormattedText
+              text={page.subtitle}
+              onOpenCitation={effectiveCitationHandler}
+            />
+          </h3>
+        )}
 
         {/* Paragraphs */}
-        <div className="space-y-2.5 text-[13.5px] text-slate-800 leading-relaxed">
+        <div className="space-y-2 text-[13.5px] text-slate-800 leading-[1.52]">
           {page.paragraphs.map((text, idx) => (
-            <p key={idx}>
-              <FormattedText text={text} onOpenCitation={onOpenCitation} />
+            <p
+              key={idx}
+              className={
+                page.hangingIndent ? 'pl-7 -indent-7 break-words' : undefined
+              }
+            >
+              <FormattedText
+                text={text}
+                onOpenCitation={effectiveCitationHandler}
+              />
             </p>
           ))}
         </div>
 
         {/* Optional Bullet Points */}
         {page.bullets && page.bullets.length > 0 && (
-          <ul className="space-y-1.5 text-[13px] text-slate-800 list-disc pl-5 leading-relaxed">
+          <ul className="space-y-1 text-[13px] text-slate-800 list-disc pl-5 leading-[1.48]">
             {page.bullets.map((item, idx) => (
               <li key={idx}>
                 <FormattedText text={item} onOpenCitation={onOpenCitation} />
@@ -255,6 +308,18 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
             ))}
           </ul>
         )}
+
+        {/* Optional Paragraphs Below Bullet Points */}
+        {page.paragraphsAfterBullets &&
+          page.paragraphsAfterBullets.length > 0 && (
+            <div className="space-y-2 text-[13.5px] text-slate-800 leading-[1.52]">
+              {page.paragraphsAfterBullets.map((text, idx) => (
+                <p key={idx}>
+                  <FormattedText text={text} onOpenCitation={onOpenCitation} />
+                </p>
+              ))}
+            </div>
+          )}
 
         {/* Optional Source / Reference Links */}
         {page.links && page.links.length > 0 && (
@@ -303,25 +368,44 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
         {/* Optional Image / GIF Slot (rendered below text) */}
         {showMediaArea && page.media && (
           <div className="flex flex-col gap-1.5">
-            <div className="rounded-[3px] border border-slate-300/80 bg-[#eeece3] overflow-hidden">
+            <div
+              className={`${
+                hasValidImage ? 'w-fit max-w-full mx-auto' : 'w-full'
+              } rounded-[3px] border border-slate-300/80 bg-[#eeece3] overflow-hidden`}
+            >
               {hasValidImage ? (
                 <div className="relative group/media">
                   <img
-                    src={page.media.src}
-                    alt={page.media.alt}
+                    src={resolvedSrc}
+                    alt={page.media.alt || section.title}
                     referrerPolicy="no-referrer"
-                    onError={() =>
-                      setImgError((prev) => ({ ...prev, [safeIndex]: true }))
-                    }
-                    className="w-full h-auto block"
+                    onError={() => {
+                      if (rawSrc && !altCaseSrcMap[rawSrc]) {
+                        const toggled = toggleFilenameFirstLetterCase(rawSrc);
+                        if (toggled && toggled !== resolvedSrc) {
+                          setAltCaseSrcMap((prev) => ({
+                            ...prev,
+                            [rawSrc]: toggled,
+                          }));
+                          return;
+                        }
+                      }
+                      setImgErrorBySrc((prev) => ({
+                        ...prev,
+                        [resolvedSrc]: true,
+                      }));
+                    }}
+                    className={`${
+                      compactMedia ? 'max-h-[156px]' : 'max-h-[200px]'
+                    } w-auto max-w-full h-auto block`}
                   />
                   {onZoomMedia && (
                     <button
                       type="button"
                       onClick={() =>
                         onZoomMedia(
-                          page.media!.src,
-                          page.media!.alt,
+                          resolvedSrc,
+                          page.media!.alt || section.title,
                           page.media!.caption
                         )
                       }
@@ -344,7 +428,7 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
             </div>
 
             {page.media.caption && (
-              <p className="text-[11.5px] text-slate-600 leading-snug">
+              <p className="text-[11.5px] text-slate-600 leading-[1.38]">
                 <FormattedText
                   text={page.media.caption}
                   onOpenCitation={onOpenCitation}
@@ -353,36 +437,36 @@ export const InfoboxCard: React.FC<InfoboxCardProps> = ({
             )}
           </div>
         )}
-
-        {/* Minimalist Footer Pagination: Sideways Pixelated Triangles + "x of x" (shown when multipage) */}
-        {totalPages > 1 && (
-          <div className="pt-2 mt-0.5 flex items-center justify-between gap-2 select-none">
-            <button
-              type="button"
-              disabled={safeIndex === 0}
-              onClick={() => onPageChange(safeIndex - 1)}
-              aria-label="Previous page"
-              className="px-tri-btn inline-flex h-8 w-8 items-center justify-center rounded-[2px] disabled:opacity-30 disabled:pointer-events-none cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500"
-            >
-              <PixelSidewaysTriangle direction="left" />
-            </button>
-
-            <span className="text-[12px] font-bold text-slate-700 tabular-nums">
-              {safeIndex + 1} of {totalPages}
-            </span>
-
-            <button
-              type="button"
-              disabled={safeIndex === totalPages - 1}
-              onClick={() => onPageChange(safeIndex + 1)}
-              aria-label="Next page"
-              className="px-tri-btn inline-flex h-8 w-8 items-center justify-center rounded-[2px] disabled:opacity-30 disabled:pointer-events-none cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500"
-            >
-              <PixelSidewaysTriangle direction="right" />
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Pinned Minimalist Footer Pagination: Sideways Pixelated Triangles + "x of x" */}
+      {totalPages > 1 && (
+        <div className="shrink-0 px-4 sm:px-5 pt-1 pb-3.5 bg-[#f7f6f0] rounded-b-[2px] flex items-center justify-between gap-2 select-none">
+          <button
+            type="button"
+            disabled={safeIndex === 0}
+            onClick={() => onPageChange(safeIndex - 1)}
+            aria-label="Previous page"
+            className="px-tri-btn inline-flex h-8 w-8 items-center justify-center rounded-[2px] disabled:opacity-30 disabled:pointer-events-none cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500"
+          >
+            <PixelSidewaysTriangle direction="left" />
+          </button>
+
+          <span className="text-[12px] font-bold text-slate-700 tabular-nums">
+            {safeIndex + 1} of {totalPages}
+          </span>
+
+          <button
+            type="button"
+            disabled={safeIndex === totalPages - 1}
+            onClick={() => onPageChange(safeIndex + 1)}
+            aria-label="Next page"
+            className="px-tri-btn inline-flex h-8 w-8 items-center justify-center rounded-[2px] disabled:opacity-30 disabled:pointer-events-none cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500"
+          >
+            <PixelSidewaysTriangle direction="right" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

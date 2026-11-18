@@ -13,6 +13,8 @@ type TokenRule = {
     | 'escape'
     | 'htmlLink'
     | 'mdLink'
+    | 'angleUrl'
+    | 'autoUrl'
     | 'citation'
     | 'boldItalic'
     | 'boldMd'
@@ -36,11 +38,13 @@ const TOKEN_RULES: TokenRule[] = [
   { type: 'escape', regex: /\\([\\*_^~[\]<>`])/ },
   { type: 'htmlLink', regex: /<a\s+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i },
   { type: 'mdLink', regex: /\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/ },
+  { type: 'angleUrl', regex: /<(https?:\/\/[^\s<>]+)>/ },
+  { type: 'autoUrl', regex: /https?:\/\/[^\s<>*"'`]+/ },
   { type: 'citation', regex: /\[(\d+)\]/ },
   { type: 'boldItalic', regex: /\*\*\*([\s\S]+?)\*\*\*/ },
   { type: 'boldMd', regex: /\*\*([\s\S]+?)\*\*/ },
   { type: 'boldHtml', regex: /<(b|strong)>([\s\S]*?)<\/\1>/i },
-  { type: 'italicMd', regex: /(?<!\*)\*(?!\*|\s)([^*\n]+?)(?<!\s|\*)\*(?!\*)/ },
+  { type: 'italicMd', regex: /(?<!\*)\*(?!\*|\s)((?:\[[^\]]*\]\([^)]*\)|[^*])+?)(?<!\s|\*)\*(?!\*)/ },
   { type: 'italicHtml', regex: /<(i|em)>([\s\S]*?)<\/\1>/i },
   { type: 'underlineHtml', regex: /<u>([\s\S]*?)<\/u>/i },
   { type: 'strikeMd', regex: /~~([\s\S]+?)~~/ },
@@ -53,11 +57,42 @@ const TOKEN_RULES: TokenRule[] = [
   { type: 'codeHtml', regex: /<code>([\s\S]*?)<\/code>/i },
 ];
 
+/** Strip trailing sentence punctuation (e.g. `,`, `.`, `)`) from bare URLs */
+function cleanBareUrl(rawUrl: string): string {
+  let clean = rawUrl;
+  while (clean.length > 0) {
+    const last = clean[clean.length - 1];
+    if (/[.,;:!?]/.test(last)) {
+      clean = clean.slice(0, -1);
+      continue;
+    }
+    if (last === ')') {
+      const opens = (clean.match(/\(/g) || []).length;
+      const closes = (clean.match(/\)/g) || []).length;
+      if (closes > opens) {
+        clean = clean.slice(0, -1);
+        continue;
+      }
+    }
+    if (last === ']') {
+      const opens = (clean.match(/\[/g) || []).length;
+      const closes = (clean.match(/\]/g) || []).length;
+      if (closes > opens) {
+        clean = clean.slice(0, -1);
+        continue;
+      }
+    }
+    break;
+  }
+  return clean;
+}
+
 function parseFormattedNodes(
   input: string,
   onOpenCitation: FormattedTextProps['onOpenCitation'],
   variant: 'light' | 'dark',
-  keyPrefix = 'fmt'
+  keyPrefix = 'fmt',
+  inItalic = false
 ): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let remaining = input;
@@ -65,13 +100,13 @@ function parseFormattedNodes(
 
   const linkClass =
     variant === 'dark'
-      ? 'font-semibold text-[#ff856d] hover:underline'
-      : 'font-semibold text-[#d9482b] hover:underline';
+      ? 'text-sky-300 hover:text-sky-200 hover:underline break-words'
+      : 'text-[#2563eb] hover:text-[#1d4ed8] hover:underline break-words';
 
   const citationClass =
     variant === 'dark'
-      ? 'inline-flex items-baseline font-semibold text-sky-300 hover:text-sky-200 hover:underline decoration-[1.5px] underline-offset-2 cursor-pointer px-[1px] rounded-[2px] focus-visible:outline-2 focus-visible:outline-sky-400'
-      : 'inline-flex items-baseline font-semibold text-[#2563eb] hover:text-[#1d4ed8] hover:underline decoration-[1.5px] underline-offset-2 cursor-pointer px-[1px] rounded-[2px] focus-visible:outline-2 focus-visible:outline-blue-500';
+      ? 'inline p-0 m-0 border-0 bg-transparent leading-[0] align-baseline font-semibold text-sky-300 hover:text-sky-200 hover:underline decoration-[1.5px] underline-offset-2 cursor-pointer px-[1px] rounded-[2px] focus-visible:outline-2 focus-visible:outline-sky-400'
+      : 'inline p-0 m-0 border-0 bg-transparent leading-[0] align-baseline font-semibold text-[#2563eb] hover:text-[#1d4ed8] hover:underline decoration-[1.5px] underline-offset-2 cursor-pointer px-[1px] rounded-[2px] focus-visible:outline-2 focus-visible:outline-blue-500';
 
   const codeClass =
     variant === 'dark'
@@ -104,8 +139,9 @@ function parseFormattedNodes(
 
     const key = `${keyPrefix}-${counter++}`;
     const fullMatch = bestMatch[0];
-    const recurse = (inner: string) =>
-      parseFormattedNodes(inner, onOpenCitation, variant, key);
+    let consumedLength = fullMatch.length;
+    const recurse = (inner: string, nextInItalic = inItalic) =>
+      parseFormattedNodes(inner, onOpenCitation, variant, key, nextInItalic);
 
     switch (bestRule.type) {
       case 'br':
@@ -150,6 +186,39 @@ function parseFormattedNodes(
         break;
       }
 
+      case 'angleUrl': {
+        const url = bestMatch[1];
+        nodes.push(
+          <a
+            key={key}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkClass}
+          >
+            {url}
+          </a>
+        );
+        break;
+      }
+
+      case 'autoUrl': {
+        const url = cleanBareUrl(fullMatch);
+        consumedLength = url.length;
+        nodes.push(
+          <a
+            key={key}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkClass}
+          >
+            {url}
+          </a>
+        );
+        break;
+      }
+
       case 'citation': {
         const citationNum = Number(bestMatch[1]);
         if (onOpenCitation && !Number.isNaN(citationNum)) {
@@ -178,7 +247,11 @@ function parseFormattedNodes(
       case 'boldItalic':
         nodes.push(
           <strong key={key} className="font-bold">
-            <em className="italic">{recurse(bestMatch[1])}</em>
+            {inItalic ? (
+              <span className="not-italic">{recurse(bestMatch[1], false)}</span>
+            ) : (
+              <em className="italic pr-[0.1em]">{recurse(bestMatch[1], true)}</em>
+            )}
           </strong>
         );
         break;
@@ -201,17 +274,29 @@ function parseFormattedNodes(
 
       case 'italicMd':
         nodes.push(
-          <em key={key} className="italic">
-            {recurse(bestMatch[1])}
-          </em>
+          inItalic ? (
+            <span key={key} className="not-italic">
+              {recurse(bestMatch[1], false)}
+            </span>
+          ) : (
+            <em key={key} className="italic pr-[0.1em]">
+              {recurse(bestMatch[1], true)}
+            </em>
+          )
         );
         break;
 
       case 'italicHtml':
         nodes.push(
-          <em key={key} className="italic">
-            {recurse(bestMatch[2])}
-          </em>
+          inItalic ? (
+            <span key={key} className="not-italic">
+              {recurse(bestMatch[2], false)}
+            </span>
+          ) : (
+            <em key={key} className="italic pr-[0.1em]">
+              {recurse(bestMatch[2], true)}
+            </em>
+          )
         );
         break;
 
@@ -241,7 +326,10 @@ function parseFormattedNodes(
 
       case 'supMd':
         nodes.push(
-          <sup key={key} className="text-[0.76em] leading-none align-super">
+          <sup
+            key={key}
+            className="relative -top-[0.28em] text-[0.75em] leading-[0] align-baseline"
+          >
             {recurse(bestMatch[1])}
           </sup>
         );
@@ -249,7 +337,10 @@ function parseFormattedNodes(
 
       case 'supHtml':
         nodes.push(
-          <sup key={key} className="text-[0.76em] leading-none align-super">
+          <sup
+            key={key}
+            className="relative -top-[0.28em] text-[0.75em] leading-[0] align-baseline"
+          >
             {recurse(bestMatch[1])}
           </sup>
         );
@@ -257,7 +348,10 @@ function parseFormattedNodes(
 
       case 'subMd':
         nodes.push(
-          <sub key={key} className="text-[0.76em] leading-none align-sub">
+          <sub
+            key={key}
+            className="relative -bottom-[0.18em] text-[0.75em] leading-[0] align-baseline"
+          >
             {recurse(bestMatch[1])}
           </sub>
         );
@@ -265,7 +359,10 @@ function parseFormattedNodes(
 
       case 'subHtml':
         nodes.push(
-          <sub key={key} className="text-[0.76em] leading-none align-sub">
+          <sub
+            key={key}
+            className="relative -bottom-[0.18em] text-[0.75em] leading-[0] align-baseline"
+          >
             {recurse(bestMatch[1])}
           </sub>
         );
@@ -281,7 +378,7 @@ function parseFormattedNodes(
         break;
     }
 
-    remaining = remaining.slice(bestIndex + fullMatch.length);
+    remaining = remaining.slice(bestIndex + consumedLength);
   }
 
   return nodes;

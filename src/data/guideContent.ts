@@ -1,7 +1,7 @@
 export interface GuideMedia {
   /** Path to an image or GIF in /public/assets/... (leave empty string "" to show an optional placeholder box) */
   src: string;
-  alt: string;
+  alt?: string;
   caption?: string;
   /** Optional text shown if src is empty (useful while drafting before adding real screenshots/GIFs) */
   placeholderLabel?: string;
@@ -14,12 +14,16 @@ export interface GuideLink {
 }
 
 export interface GuidePage {
-  /** Sub-heading shown at the top of this page inside the infobox */
-  subtitle: string;
+  /** Optional sub-heading shown at the top of this page inside the infobox */
+  subtitle?: string;
   /** Body paragraphs — simply add or edit strings here */
   paragraphs: string[];
-  /** Optional bullet list rendered below the paragraphs */
+  /** Optional bullet list rendered below `paragraphs` */
   bullets?: string[];
+  /** Optional paragraphs rendered AFTER the `bullets` list */
+  paragraphsAfterBullets?: string[];
+  /** Format paragraphs with a hanging indent (ideal for APA/MLA References lists) */
+  hangingIndent?: boolean;
   /** Optional list of external/source links or citations */
   links?: GuideLink[];
   /** Optional image or animated GIF featured on this page */
@@ -53,7 +57,7 @@ export type FooterModalId =
 export type SectionId = PageSectionId | TopButtonId | FooterModalId;
 
 export interface CitationEntry {
-  /** Optional custom header title (defaults to "Reference [n]") */
+  /** Optional custom header title (defaults to "Reference") */
   title?: string;
   /** Full citation text — supports *italics*, **bold**, ^superscript^, \n line breaks, and [links](https://...) */
   text: string;
@@ -79,6 +83,7 @@ export interface CitationEntry {
  *    - Superscript:  `^sup^` or `<sup>sup</sup>`  (e.g. `^[1]^` for superscript citation)
  *    - Subscript:    `~sub~` or `<sub>sub</sub>`
  *    - Inline link:  `[link text](https://example.com)`
+ *    - Plain URL:    `https://example.com` (automatically becomes a live link!)
  *
  * 3. CLICKABLE CITATIONS (`[1]`, `[2]`, etc.):
  *    Write `[1]`, `[2]`, etc. anywhere in a paragraph, bullet, or caption.
@@ -88,13 +93,16 @@ export interface CitationEntry {
 
 export const CITATIONS: Record<number, CitationEntry> = {
   1: {
-    text: 'Add your full citation for [1] here in `CITATIONS` inside **src/data/guideContent.ts** (supports *italics*, **bold**, and links).',
-    url: '',
+    text: 'Werning, S. (2019). Itch. io and the one-dollar-game: How distribution platforms affect the ontology of (games as) a medium.',
   },
   2: {
-    text: 'itch.io. *Getting Started — Creator Documentation*.',
-    url: 'https://itch.io/docs/creators/getting-started',
-    urlLabel: 'itch.io/docs/creators/getting-started',
+    text: 'Tuominen, K. (2026, January 6). *What is itch.io and what am I doing there?*. BoardGameGeek. https://boardgamegeek.com/blog/16853/blogpost/181984/what-is-itchio-and-what-am-i-doing-there',
+  },
+  3: {
+    text: 'Itch.io. (n.d.). *Your first itch.io page.* itch.io. https://itch.io/docs/creators/getting-started',
+  },
+  4: {
+    text: 'Itch.io. (n.d.). *Content creator quality guidelines.* itch.io. https://itch.io/docs/creators/quality-guidelines#tags',
   },
 };
 
@@ -111,23 +119,46 @@ export const TOP_BUTTON_GUIDES: Record<TopButtonId, GuideSection> = {
         ],
         media: {
           src: '/assets/Night_with_timber.png',
-          alt: 'Example overview of visual novel pages on itch.io',
           placeholderLabel: 'Optional Image / GIF: Examples of VN itch.io pages',
-          caption: 'Add a screenshot or GIF in guideContent.ts to showcase real examples.',
+          caption: '[*Night with Timber*](https://nomnomnami.itch.io/night-with-timber) by NomnomNami, an example of a visual novel.',
         },
       },
       {
         subtitle: 'Visual novels (cont.)',
         paragraphs: [
-          'Due to the cost of content creation for major studios and the sheer amount of content involved in the branching storylines of visual novels, however [1], works of this genre have largely been indie games, or independent video games—games produced by individuals or small teams instead of by large companies/studios. This presents a challenge to the visibility of visual novels in the gaming world.',
+          'Due to the cost of content creation for major studios and the sheer amount of content involved in the branching storylines of visual novels, however^[1]^, works of this genre have largely been indie games, or independent video games—games produced by individuals or small teams instead of by large companies/studios. This presents a challenge to the visibility of visual novels in the gaming world.',
         ],
         
       },
       {
         subtitle: 'itch.io',
         paragraphs: [
-          'Enter itch.io—a popular online platform catering to indie games. Unlike other game platforms like Steam where games must be approved, itch.io notably allows anyone with a registered account can upload their projects [2], making it an ideal choice for indie developers, and a hub for visual novels and other narrative-based works too.',
+          'Enter itch.io—a popular online platform catering to indie games. Unlike other game platforms like Steam where games must be approved, itch.io notably allows anyone with a registered account can upload their projects^[2]^, making it an ideal choice for indie developers, and a hub for visual novels and other narrative-based works too.',
         ],
+        media: {
+          src: '/assets/Itch_io_homepage.jpeg',
+          caption: 'The itch.io homepage.',
+        },
+      },
+      {
+        subtitle: 'itch.io game pages',
+        paragraphs: [
+          'All itch.io games, visual novels included, are accessed through designated game pages—landing sites that function as an informational page, download site, and community hub all in one. Designed by the developer using a built-in editor, they are listed under an itch.io subdomain given to each creator, which hosts all the developer’s other project pages and their personal homepage. They can be accessed from the developer page or the itch.io homepage, which displays game suggestions, but since login is not required to view these pages, they can also be found in search results or opened from shared links.',
+        ],
+        media: {
+          src: '/assets/Itch_io_game_pages.jpeg',
+          caption: 'Various itch.io game pages.\n*Sources (clockwise from upper left):\n[*Feed the Scorchbot*](https://indieformer.itch.io/feed-the-scorchpot) by Indieformer\n[*Sploob*](https://mors-games.itch.io/sploob) by Mors\n[*Night in the Woods*](https://finji.itch.io/night-in-the-woods) by Finji\n[*Keepsake County*](https://forwardinstinct.itch.io/keepsake-county) by Forward Instinct*',
+        },
+      },
+      {
+        subtitle: 'itch.io game pages for visual novels',
+        paragraphs: [
+          'Because game pages are designed by individual creators, they can look quite different for different types of games. All pages share a basic structure and a few features built in by itch.io, but everything else is up to the creator. This guide—a mock itch.io page for a fictional visual novel—will go into the conventions followed by visual novel creators in their game pages as well as the more general anatomy of itch.io game pages along the way, and also teach creators how to customize their page through the built-in settings. My hope is to help developers of visual novels and other narrative-driven games make effective use the format of the itch.io page to promote their work.',
+        ],
+        media: {
+          src: '/assets/Bad_end_theater.jpeg',
+          caption: 'Game page for [*Bad End Theater*](https://nomnomnami.itch.io/bad-end-theater), a visual novel by NomnomNami',
+        },
       },
     ],
   },
@@ -138,39 +169,49 @@ export const TOP_BUTTON_GUIDES: Record<TopButtonId, GuideSection> = {
     title: 'Creating and editing your itch.io page',
     pages: [
       {
-        subtitle: 'Setting Up Your Project Dashboard',
+        subtitle: 'Creating your account',
         paragraphs: [
-          'Creators build their game page from the “Edit game” dashboard on itch.io, filling out the title, classification (Games), kind of project (Downloadable or HTML), pricing, description, and uploads.',
-          'Once saved, you can switch to “Edit theme” directly on the public page to customize colors, fonts, background images, and banner artwork.',
+          'If you don’t have an account already, make one by clicking the “register” button in the top-right corner of the itch.io homepage, and filling out the registration form with your information!',
         ],
         media: {
-          src: '',
-          alt: 'Screenshot of the itch.io Edit Theme panel',
-          placeholderLabel: 'Optional GIF: Opening the Edit Theme sidebar on itch.io',
-          caption: 'Drop a GIF here showing how creators customize page themes.',
+          src: '/assets/New_account.gif',
         },
       },
       {
-        subtitle: 'Visual Theme & Custom CSS',
+        subtitle: 'Creating your page',
         paragraphs: [
-          'Most visual novel pages match the color palette and typography of their in-game dialogue UI so the storefront feels like an extension of the story.',
+          'To create a new game page, navigate to the “V” besides your username in the top-right and click “upload new project” from the drop-down menu that appears. This will bring up a form asking for your game’s name, the game files, and some basic information that will appear on your page—but don’t too much worry about filling it all in now, you can always go back to it later. Once you’re done, click the “save & view page” button at the bottom to launch your page!',
         ],
-        bullets: [
-          'Upload a wide header banner (typically 960px wide) to establish tone immediately.',
-          'Choose a dark or muted background color so screenshots and text remain easy to read.',
-          'Use custom HTML/CSS (if enabled on your account) for dividers, custom bullet styling, or collapsible sections.',
-        ],
+        media: {
+          src: '/assets/New_project.gif',
+        },
       },
       {
-        subtitle: 'Checklist Before Publishing',
+        subtitle: 'Dashboard',
         paragraphs: [
-          'Before switching your page visibility from Draft to Public, double-check that players have all the practical information they need:',
+          'This is the interface for editing the content on the page. To bring it up, click “edit game” at the top navigation bar when viewing your page. The form you saw when creating your page will now appear under the “edit game” tab, which sits beside new tabs for devlog posts, metadata, and more!',
         ],
-        bullets: [
-          'Clear playtime, word count, and content warnings in the description.',
-          'At least 3–4 readable gameplay screenshots showing the text box and art.',
-          'Accurate genre, language, and accessibility tags inside “More information”.',
+        media: {
+          src: '/assets/Dashboard.gif',
+        },
+      },
+      {
+        subtitle: 'Theme editor',
+        paragraphs: [
+          'Spice up your page using the theme editor! To access this, click the “edit theme” button at the top navigation bar when viewing your page. This will bring up a sidebar you can use to change the font, color, and size of text, background colors, and even the color of links and buttons, as well as add images for the banner and background!',
         ],
+        media: {
+          src: '/assets/Theme_editor.gif',
+        },
+      },
+      {
+        subtitle: 'Publishing your page',
+        paragraphs: [
+          'When you’re all done with your game page, go into the “edit game” tab in the dashboard and head down to the “visibility & access” setting at the bottom to switch your page from “draft” to “public” mode!',
+        ],
+        media: {
+          src: '/assets/Publish.gif',
+        },
       },
     ],
   },
@@ -180,30 +221,20 @@ export const SECTION_GUIDES: Record<PageSectionId, GuideSection> = {
   banner: {
     id: 'banner',
     category: 'Page Section',
-    title: 'Header Banner',
+    title: 'Banner',
     pages: [
       {
-        subtitle: 'First Impression & Visual Tone',
         paragraphs: [
-          'The header banner spans the top of the 960px game column and replaces itch.io’s plain text title when uploaded.',
-          'For visual novels, the banner almost always pairs stylized title typography with key character art or atmospheric scenery to signal genre, tone, and art style at a glance.',
+          'This is full-width graphic at the top of your page containing a stylized version of game’s title. Often, it will also include illustrations related to the game, such as character art. ',
         ],
-        media: {
-          src: '',
-          alt: 'Examples of visual novel banners',
-          placeholderLabel: 'Optional Image / GIF: Banner composition examples',
-          caption: 'Replace with example banners or a before/after GIF.',
-        },
       },
       {
-        subtitle: 'Design & Readability Tips',
         paragraphs: [
-          'Because banners sit directly above the body text, strong contrast between the title lettering and background art helps visitors read the game’s name immediately—even on smaller screens.',
+          'To add this, click the “edit theme” button on the top navigation bar when viewing your game page. This will bring up the theme editor, which contains the option to add or change the banner at the bottom. Adding a banner will replace the default title that appears at the top for all itch.io pages. Make it eye catching since it’s the first thing your visitor will see! Transparent PNGs and animated GIFs also work here.',
         ],
-        bullets: [
-          'Recommended width is 960px (or 1920px for crisp Retina displays).',
-          'Keep important text centered or away from extreme edges in case of mobile cropping.',
-        ],
+        media: {
+          src: '/assets/Banner.gif',
+        },
       },
     ],
   },
@@ -211,40 +242,47 @@ export const SECTION_GUIDES: Record<PageSectionId, GuideSection> = {
   description: {
     id: 'description',
     category: 'Page Section',
-    title: 'Game Description',
+    title: 'Description',
     pages: [
       {
-        subtitle: 'Story Hook & Premise',
         paragraphs: [
-          'Everything above “More information” lives inside itch.io’s main rich-text description editor.',
-          'Visual novel pages usually open with a concise 2–4 line narrative hook or atmospheric premise—inviting the reader into the protagonist’s predicament without spoiling major plot twists.',
-        ],
-      },
-      {
-        subtitle: 'Scope, Specs & Content Warnings',
-        paragraphs: [
-          'Right beneath the story blurb, creators list key reading specs so players know what kind of experience to expect before committing.',
+          'This is where you get to talk about your visual novel! Make sure it includes:',
         ],
         bullets: [
-          'Playtime & length (e.g., “3–4 hours”, “23,000 words, 750 illustrations, 6 endings”).',
-          'Content Warnings (CW) so readers can navigate sensitive themes comfortably.',
+          'A brief 1-3 game summary',
+          'Credits (including translations)',
+          'Play time and length',
+          'Content Warnings (if applicable)',
         ],
-      },
-      {
-        subtitle: 'Credits & Collaborators',
-        paragraphs: [
-          'Unlike storefronts that hide individual contributors behind a studio name, itch.io visual novel pages highlight every creator’s role—writing, art, music, programming, and animation—often linking directly to each member’s portfolio.',
+        paragraphsAfterBullets: [
+          'You can add this using the textbox in your dashboard’s “edit game” tab. Be sure to separate each section with paragraph breaks or headings!',
         ],
         media: {
-          src: '',
-          alt: 'Example of formatted credits and links',
-          placeholderLabel: 'Optional Image: Hyperlinked credits formatting example',
+          src: '/assets/Description.gif',
         },
       },
       {
-        subtitle: 'Translations & Localization',
+        subtitle: 'Game summary',
         paragraphs: [
-          'Many visual novels list supported languages and fan/official translation credits directly in the description so international players can immediately see whether their language is available.',
+          'This is a normally 1-3 sentence logline or blurb for the story. Hook your reader here with a cliffhanger; you can tease the characters, the settings, themes/conflicts, or what the player gets to do—but not enough to spoil the story! You might also write in this hook as a short question at the end. Separate your summary into paragraphs of 1-2 sentences each to minimize cognitive load for readers—remember that this is supposed to capture the reader’s attention!',
+        ],
+      },
+      {
+        subtitle: 'Credits',
+        paragraphs: [
+          'Credit any contributions from others on your game by making a vertical list of those contributions (e.g. “art”, “writing”) followed by the contributors’ names. This includes translations if applicable—put these under a separate heading and write the name of each language in its native form instead of English. This is something you may have to look up!',
+        ],
+      },
+      {
+        subtitle: 'Play time & length',
+        paragraphs: [
+          'Give an estimated play time or range of playtimes (normally in hours). Length can be described in a range of ways—word count, number of endings, or even the number of illustrations!',
+        ],
+      },
+      {
+        subtitle: 'Content warnings',
+        paragraphs: [
+          'If your game addresses potentially difficult or upsetting themes, include content warnings in your description. You might write “Content warnings:” (or “CW:”) then follow with a list of sensitive topics. See [here](https://itch.io/jam/what-are-you-afraid-of-/topic/6178439/content-warnings-and-how-to-write-them) for a comprehensive list of themes to make note of. ',
         ],
       },
     ],
@@ -256,21 +294,27 @@ export const SECTION_GUIDES: Record<PageSectionId, GuideSection> = {
     title: 'More information',
     pages: [
       {
-        subtitle: 'Collapsible Metadata Drawer',
         paragraphs: [
-          'Clicking “More information” on an itch.io page expands a structured table of metadata fields generated from your project settings.',
-          'Try clicking the “More information” link right on this mock page to see the drawer expand!',
+          'This is a collapsible box built into the page by default displaying a a game’s tags—descriptive keywords used by creators across itch.io to help players discover their games. Just like how hashtags work, clicking one opens up a search window filtering for other games under that same tag. Use tags to let potential fans find their way to your game!',
         ],
       },
       {
-        subtitle: 'Tags, Genre & Discoverability',
+        subtitle: 'Genre/thematic tags',
         paragraphs: [
-          'While the main description is freeform prose for human readers, the fields inside “More information” power itch.io’s search filters, browse directories, and tag pages.',
+          'You can add tags for the content of your game in the “edit game” tab of your dashboard. For the “genre” setting, choose 1 genre tag that best describes your game from a dropdown list—this should be “visual novel”! For the “tags” setting, after that, choose up to 10 additional thematic tags. Although you can create a brand-new tag here, Itch.io advises picking from the suggested tags if possible to make your game easier to find.^[4]^',
         ],
-        bullets: [
-          'Genre (Visual Novel / Interactive Fiction) & Tags (up to 10 descriptive tags).',
-          'Platforms, Languages, Inputs, and Accessibility features.',
+        media: {
+          src: '/assets/Thematic_tags.gif',
+        },
+      },
+      {
+        subtitle: 'Metadata tags',
+        paragraphs: [
+          'You can also include tags for more technical information by going to the “metadata” tab of the dashboard. Here, you can add tags about input methods, accessibility, languages available, and even the tools you used to make your game!',
         ],
+        media: {
+          src: '/assets/Metadata_tags.gif',
+        },
       },
     ],
   },
@@ -278,25 +322,25 @@ export const SECTION_GUIDES: Record<PageSectionId, GuideSection> = {
   purchase: {
     id: 'purchase',
     category: 'Page Section',
-    title: 'Purchase & Downloads',
+    title: 'Download/purchase area',
     pages: [
       {
-        subtitle: 'Pricing & “Or More” Patronage',
         paragraphs: [
-          'itch.io supports free releases, Pay-What-You-Want donations, and minimum-price purchases with an optional “or more” tip prompt.',
-          'When a minimum price is set (such as $9.99 USD), the coral-red “Buy Now” button displays the listed downloadable files and file sizes underneath.',
+          'This is where the reader makes their big decision! This area contains the “download” button for free games, or the “buy now” button for paid games. If your game is paid, the starting price you set will appear beside the button, followed by “or more,” as itch.io utilizes flexible pricing. ',
         ],
-        media: {
-          src: '',
-          alt: 'Comparison of Free vs PWYW vs Paid purchase boxes',
-          placeholderLabel: 'Optional Image / GIF: Purchase box variations',
-        },
       },
       {
-        subtitle: 'Files, Demos & Supporter Extras',
         paragraphs: [
-          'Visual novel creators frequently pair a paid full build with a free browser/downloadable demo, or bundle bonus paratexts like digital artbooks, wallpapers, and soundtracks.',
+          'Further down below is an overview of the files the reader will receive from the download listing file names, file size, and corresponding platform. These are not always just the game files but sometimes also include goodies that the developer includes with the game, such as art collections!  If you’ve decided to give players a steam key, this area will also make note of that.',
         ],
+      },
+      {
+        paragraphs: [
+          'You can adjust the files/file information and set a price (if any) in the “edit page” tab of your dashboard by finding the “pricing” and “uploads” sections.',
+        ],
+        media: {
+          src: '/assets/Purchase_area.gif',
+        },
       },
     ],
   },
@@ -307,20 +351,21 @@ export const SECTION_GUIDES: Record<PageSectionId, GuideSection> = {
     title: 'Development log',
     pages: [
       {
-        subtitle: 'Ongoing Project Timeline',
         paragraphs: [
-          'The Development log (devlog) displays chronological posts linked to the project—ranging from major content patches and mobile ports to behind-the-scenes art posts and merch announcements.',
+          'This is where returning players will get up to speed on your game! As you write development log posts about updates, merch drops, and more; this feed will populate with the titles of those posts. Clicking a title will bring you the corresponding post.',
+        ],
+      },
+      {
+        paragraphs: [
+          'To write devlog posts, navigate to the “devlog” tab of your dashboard and click “write a new post.” From here, you can title your post and compose it, as well as adjust any other settings as needed. Make sure to hit “publish” at the bottom when you’re done!',
         ],
         media: {
-          src: '',
-          alt: 'Example of an itch.io devlog post',
-          placeholderLabel: 'Optional Image / GIF: Inside an itch.io devlog post',
+          src: '/assets/Devlog.gif',
         },
       },
       {
-        subtitle: 'Keeping Followers Engaged',
         paragraphs: [
-          'Publishing a devlog notifies people who follow the creator or project, making it one of the most effective ways for serialized or multi-chapter visual novels to retain an audience between updates.',
+          'Keep your titles short and sweet—ditch complete sentences for just the bare keywords of your announcement, and don’t afraid to be expressive here with exclamation marks! You want to give these entries a personal voice.',
         ],
       },
     ],
@@ -329,19 +374,20 @@ export const SECTION_GUIDES: Record<PageSectionId, GuideSection> = {
   comments: {
     id: 'comments',
     category: 'Page Section',
-    title: 'Comments Section',
+    title: 'Comments/community section',
     pages: [
       {
-        subtitle: 'Reader Reactions & Community',
         paragraphs: [
-          'At the bottom of an itch.io game page sits the comment thread. Players often treat it like a guestbook—sharing favorite routes, emotional reactions, bug reports, or questions.',
+          'This is where players can talk to you, or each other, about your game! Build community by engaging with them here!',
         ],
       },
       {
-        subtitle: 'Author Replies & Moderation',
         paragraphs: [
-          'Creators can reply directly with an Author badge, upvote helpful feedback, or pin important announcements (like FAQ answers or known bug workarounds).',
+          'You can choose between a regular comment section or a discussion board, which uses threads instead of comments at the bottom of the “edit page” tab in your dashboard (or alternatively, disable it entirely).',
         ],
+        media: {
+          src: '/assets/Comments.gif',
+        },
       },
     ],
   },
@@ -349,30 +395,15 @@ export const SECTION_GUIDES: Record<PageSectionId, GuideSection> = {
   screenshots: {
     id: 'screenshots',
     category: 'Page Section',
-    title: 'Gameplay Screenshots',
+    title: 'Screenshots',
     pages: [
       {
-        subtitle: 'Proving Reading Comfort & Visual Style',
         paragraphs: [
-          'The right-hand column holds a vertical stack of gameplay screenshots (and optionally an embedded trailer).',
-          'Because players spend hours reading a visual novel, screenshots show more than art—they demonstrate textbox contrast, font legibility, UI polish, and variety of scenes.',
+          'For downloadable projects, these will be organized in a parallel column besides the description by default. Attach 3-5 captures of key gameplay moments as suggested by itch.io guidelines^[3]^(GIFs work too!) to give your reader a visual preview of your game by going into the “edit game” tab of your dashboard! You will see an option to add screenshots, as well as the option to add a game trailer on YouTube or Vimeo if you have one, which will appear the very top.',
         ],
         media: {
-          src: '',
-          alt: 'Annotated visual novel screenshot example',
-          placeholderLabel: 'Optional GIF: Cycling through gameplay screenshots',
+          src: '/assets/Screenshots.gif',
         },
-      },
-      {
-        subtitle: 'What Screenshots to Include',
-        paragraphs: [
-          'Strong visual novel sidebars show a mix of moments rather than four identical dialogue frames:',
-        ],
-        bullets: [
-          'Standard dialogue scene showing character sprites + UI textbox.',
-          'Branching choice menu or interactive gameplay screen.',
-          'Special event CGs or atmospheric background transitions.',
-        ],
       },
     ],
   },
@@ -385,26 +416,12 @@ export const FOOTER_GUIDES: Record<FooterModalId, GuideSection> = {
     title: 'References',
     pages: [
       {
-        subtitle: 'Sources & Further Reading',
+        hangingIndent: true,
         paragraphs: [
-          'Information in this genre guide draws from itch.io’s creator documentation and conventions observed across indie visual novel pages on itch.io.',
-        ],
-        links: [
-          {
-            label: 'itch.io Creator Docs — Designing Your Page',
-            url: 'https://itch.io/docs/creators/design',
-            note: 'Official documentation on banners, themes, screenshots, and custom CSS.',
-          },
-          {
-            label: 'itch.io Creator Docs — Quality Guidelines & Metadata',
-            url: 'https://itch.io/docs/creators/quality-guidelines',
-            note: 'Best practices for tags, descriptions, classifications, and discoverability.',
-          },
-          {
-            label: 'itch.io Creator Docs — Devlogs',
-            url: 'https://itch.io/docs/creators/devlogs',
-            note: 'Overview of project update posts and follower notifications.',
-          },
+          '^[1]^ Werning, S. (2019). Itch. io and the one-dollar-game: How distribution platforms affect the ontology of (games as) a medium.',
+          '^[2]^ Tuominen, K. (2026, January 6). *What is itch.io and what am I doing there?*. BoardGameGeek. https://boardgamegeek.com/blog/16853/blogpost/181984/what-is-itchio-and-what-am-i-doing-there',
+          '^[3]^ Itch.io. (n.d.). *Your first itch.io page.* itch.io. https://itch.io/docs/creators/getting-started',
+          '^[4]^ Itch.io. (n.d.). *Content creator quality guidelines.* itch.io. https://itch.io/docs/creators/quality-guidelines#tags',
         ],
       },
     ],
@@ -416,14 +433,10 @@ export const FOOTER_GUIDES: Record<FooterModalId, GuideSection> = {
     title: 'Credits',
     pages: [
       {
-        subtitle: 'Guide & Mock Page Credits',
         paragraphs: [
-          'This interactive genre guide and mock visual novel storefront (“Out of Time”) were created to illustrate how indie visual novel developers structure and customize itch.io game pages.',
-        ],
-        bullets: [
-          'Genre Guide Research, Writing & Mock Page (“Out of Time”) — 5a1ad',
-          'Mock Visual Novel Artwork & Screenshots — 5a1ad',
-          'Storefront Platform Layout & Iconography — itch.io',
+          'Created by Eugene Wei for UWP 012',
+          'Content, design, and illustration (banner & screenshots) of mock page by Eugene Wei',
+          'Interactive features (highlighting, buttons, infoboxes) created with the help of Google AI Studio',
         ],
       },
     ],
