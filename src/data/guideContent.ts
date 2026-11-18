@@ -156,8 +156,8 @@ export const TOP_BUTTON_GUIDES: Record<TopButtonId, GuideSection> = {
           'Because game pages are designed by individual creators, they can look quite different for different types of games. All pages share a basic structure and a few features built in by itch.io, but everything else is up to the creator. This guide—a mock itch.io page for a fictional visual novel—will go into the conventions followed by visual novel creators in their game pages as well as the more general anatomy of itch.io game pages along the way, and also teach creators how to customize their page through the built-in settings. My hope is to help developers of visual novels and other narrative-driven games make effective use the format of the itch.io page to promote their work.',
         ],
         media: {
-          src: '/assets/Bad_end_theater.jpeg',
-          caption: 'Game page for [*Bad End Theater*](https://nomnomnami.itch.io/bad-end-theater), a visual novel by NomnomNami',
+          src: '/assets/Lookouts.jpeg',
+          caption: 'Game page for [*Lookouts*](https://paranoidhawk.itch.io/lookouts), a visual novel by paranoidhawk',
         },
       },
     ],
